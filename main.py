@@ -8,6 +8,8 @@ Created on Wed Nov 19 16:12:02 2014
 
 import scipy.io
 import matplotlib.pyplot as plt
+from sklearn import cross_validation
+import run_knn
 
 imagesDic = scipy.io.loadmat(file_name="labeled_images.mat")
 tr_images = imagesDic["tr_images"]
@@ -17,6 +19,6 @@ tr_labels = imagesDic["tr_labels"]
 plt.figure(1)
 plt.clf()
 
-plt.imshow(tr_images[:,:,0].reshape(32, 32), cmap=plt.cm.gray)
+plt.imshow(tr_images[:,:,2], cmap=plt.cm.gray)
 #plt.draw()
 plt.show()

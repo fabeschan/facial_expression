@@ -11,6 +11,7 @@ import scipy.io
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn import cross_validation
+from sklearn import datasets, neighbors, linear_model, svm, naive_bayes, tree
 import run_knn, skLearnStuff
 
 imagesDic = scipy.io.loadmat(file_name="labeled_images.mat")
@@ -47,9 +48,33 @@ plt.show()
 #valid_img = np.array([ valid_img[:,:,i].reshape(-1) for i in xrange(valid_img.shape[2]) ])
 
 #labels = run_knn.run_knn(5, train_img, train_labels, train_img)
-skLearnStuff.test(train_img, train_labels.ravel(), classifier=None, verbose=True)
 
+classifiers = [
+    linear_model.RidgeClassifierCV(),
+    #neighbors.NearestNeighbors(n_neighbors=2, algorithm='ball_tree'),
+    neighbors.KNeighborsClassifier(),
+    naive_bayes.GaussianNB(),
+    tree.DecisionTreeClassifier(criterion="entropy"),
+]
 
-#false_count = np.flatnonzero(valid_labels - labels).size
-#rate = float(valid_labels.size - false_count)/valid_labels.size
-#print(rate)
+pred_ensemble = []
+
+for c in classifiers:
+    score, pred, y_test = skLearnStuff.test(train_img, train_labels.ravel(), classifier=c, verbose=True)
+    pred_ensemble.append(pred)
+
+pred_ensemble = np.array(pred_ensemble)
+pred_voted = np.zeros(pred_ensemble.shape[1])
+for i in range(pred_ensemble.shape[1]):
+    d = {}
+    for k in pred_ensemble[:,i]:
+        t = d.get(k, 0)
+        d[k] = t + 1
+    pred_voted[i] = max(d.keys(), key=lambda x: d[x])
+
+print pred_voted
+valid_labels = train_labels[0.85 * train_labels.size:]
+
+false_count = np.flatnonzero(valid_labels.reshape(-1) - pred_voted.reshape(-1)).size
+rate = float(valid_labels.size - false_count)/valid_labels.size
+print(rate)

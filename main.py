@@ -11,7 +11,7 @@ import scipy.io
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn import cross_validation
-import run_knn
+import run_knn, skLearnStuff
 
 imagesDic = scipy.io.loadmat(file_name="labeled_images.mat")
 tr_images = imagesDic["tr_images"]
@@ -40,14 +40,16 @@ plt.show()
 #b = np.array([[4,3],[3,2]])
 #c = np.array([[2,4],[4,1]])
 #
-#train_img = np.array([a,b,c,a,b,c])
+#train_img = np.array([a,b,c,a,b,c]).T
 #train_labels = np.array([2,3,4,2,3,4])
-#valid_img = np.array([c,a,c,b,b,c])
+#valid_img = np.array([c,a,c,b,b,c]).T
 #train_img = np.array([ train_img[:,:,i].reshape(-1) for i in xrange(train_img.shape[2]) ])
 #valid_img = np.array([ valid_img[:,:,i].reshape(-1) for i in xrange(valid_img.shape[2]) ])
 
-labels = run_knn.run_knn(1, train_img.T, train_labels.T, valid_img.T)
+#labels = run_knn.run_knn(5, train_img, train_labels, train_img)
+skLearnStuff.test(train_img, train_labels.ravel(), classifier=None, verbose=True)
 
-false_count = np.flatnonzero(valid_labels - labels).size
-rate = float(valid_labels.size - false_count)/valid_labels.size
-print(rate)
+
+#false_count = np.flatnonzero(valid_labels - labels).size
+#rate = float(valid_labels.size - false_count)/valid_labels.size
+#print(rate)

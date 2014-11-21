@@ -10,7 +10,7 @@ Created on Wed Nov 19 16:12:02 2014
 import scipy.io
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn import cross_validation
+#from sklearn import cross_validation
 import run_knn
 
 imagesDic = scipy.io.loadmat(file_name="labeled_images.mat")
@@ -46,7 +46,10 @@ plt.show()
 #train_img = np.array([ train_img[:,:,i].reshape(-1) for i in xrange(train_img.shape[2]) ])
 #valid_img = np.array([ valid_img[:,:,i].reshape(-1) for i in xrange(valid_img.shape[2]) ])
 
-labels = run_knn.run_knn(1, train_img.T, train_labels.T, valid_img.T)
+labels = run_knn.run_knn(1, train_img, train_labels, valid_img)
+plt.figure(1)
+plt.imshow(train_img[2,:].reshape(32, 32), cmap=plt.cm.gray)
+plt.show()
 
 false_count = np.flatnonzero(valid_labels - labels).size
 rate = float(valid_labels.size - false_count)/valid_labels.size

@@ -26,11 +26,12 @@ def run_knn(k, train_data, train_labels, valid_data):
                       for the validation data.
     """
 
-    dist = l2_distance(valid_data, train_data)
+    dist = l2_distance(valid_data.T, train_data.T)
     nearest = np.argsort(dist, axis=1)[:,:k]
 
     train_labels = train_labels.reshape(-1)
     valid_labels = train_labels[nearest]
+    print np.sum(valid_labels != valid_labels[0])
 
     # note this only works for binary labels
     valid_labels = (np.mean(valid_labels, axis=1) >= 0.5).astype(np.int)

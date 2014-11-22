@@ -80,7 +80,6 @@ plt.show()
 """
 
 def transform_(tr_images, x, y):
-    from PIL import Image
     x_width = 32 + abs(x)
     y_width = 32 + abs(y)
 
@@ -89,13 +88,11 @@ def transform_(tr_images, x, y):
         x_a, x_b = x, x+32
     else:
         x_a, x_b = 0, 32
-    x_a, x_b = 0, 32
 
     if y >= 0:
         y_a, y_b = y, y+32
     else:
         y_a, y_b = 0, 32
-    y_a, y_b = 0, 32
 
     r = np.array([ imresize(tr_images[:,:,i], (x_width,y_width))[x_a:x_b,y_a:y_b] for i in xrange(tr_images.shape[2]) ])
     return np.rollaxis(r, 0, 3)

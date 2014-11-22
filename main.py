@@ -100,6 +100,59 @@ def write_to_file(predictions):
             s = "{},{}\n".format(i+1, predictions[i])
             f.write(s)
 
+def cross_validations(classifier, images, labels, identity, nFold=10):
+    d = {}
+
+    #create dictionary of {identities: indicies of corresponding labels}
+    for i in range(len(identity)):
+        t = d.get(identity[i][0], [])
+        d[identity[i][0]] = t
+        t.append(i)
+    
+    #create folds
+    folds = cross_validation.KFold(len(d.keys()), nFold)
+    
+    scores = []
+    
+    #convert fold randomization into usable indicies    
+    for train_index, test_index in folds:
+
+        tr_images = []
+        tr_labels = []
+
+        val_images = []
+        val_labels = []
+        
+        imageIndex = [d.values()[i] for i in train_index.tolist()]
+        for index in imageIndex:
+            tr_images = tr_images + [images[i] for i in index]
+            tr_labels = tr_labels + [labels[i] for i in index]
+
+        imageIndex = [d.values()[i] for i in test_index.tolist()]
+        for index in imageIndex:
+            val_images = val_images + [images[i] for i in index]
+            val_labels = val_labels + [labels[i] for i in index]
+            
+        tr_images = np.array(tr_images)
+        tr_labels = np.array(tr_labels)
+        val_images = np.array(val_images)
+        val_labels = np.array(val_labels)      
+        
+        trained = classifier.fit(tr_images, tr_labels.ravel())
+        
+        score = trained.score(val_images, val_labels.ravel())
+        scores.append(score)
+        
+    scores = np.array(scores)
+    print scores
+    return np.average(scores)
+            
+        
+    
+#        images_folds.append(images[d[indicies]])
+#        labels_folds.append(labels[d[indicies]])
+        
+    
 if __name__ == '__main__':
     tr_images, tr_labels, tr_identity, test_images = init_data()
     #labels = run_knn.run_knn(5, train_img, train_labels, train_img)
@@ -111,6 +164,7 @@ if __name__ == '__main__':
         #naive_bayes.GaussianNB(),
         #tree.DecisionTreeClassifier(criterion="entropy"),
     ]
-
+    score = cross_validations(classifiers[0], tr_images, tr_labels, tr_identity, nFold = 10)
+    print "Validation Score: "+str(score)
     rate, pred_voted = evaluate_multiple(classifiers, tr_images, tr_labels)
     write_to_file(pred_voted)

@@ -8,6 +8,7 @@ Created on Wed Nov 19 16:12:02 2014
 """
 
 import scipy.io
+from scipy.misc import *
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn import cross_validation
@@ -27,6 +28,17 @@ def init_data():
     imagesDic = scipy.io.loadmat(file_name="public_test_images.mat")
     test_images = imagesDic["public_test_images"].astype(float)
 
+    SHOW_TRANSFORM_COMPARISON = False
+    if SHOW_TRANSFORM_COMPARISON:
+        trtr = transform_(tr_images, 4, 4)
+        plt.figure(1)
+        plt.clf()
+        plt.imshow(trtr[:,:,0], cmap=plt.cm.gray)
+        plt.show()
+        plt.figure(2)
+        plt.clf()
+        plt.imshow(tr_images[:,:,0], cmap=plt.cm.gray)
+        plt.show()
     # Preprocess the training set
     tr_images = np.array([tr_images[:,:,i].reshape(-1) for i in xrange(tr_images.shape[2])])
     tr_images = preprocessing.scale(tr_images,1)
@@ -52,6 +64,26 @@ plt.clf()
 plt.imshow(tr_images[:,:,2], cmap=plt.cm.gray)
 plt.show()
 """
+
+def transform_(tr_images, x, y):
+    from PIL import Image
+    x_width = 32 + abs(x)
+    y_width = 32 + abs(y)
+
+    # x_a, x_b, y_a, y_b are the limits
+    if x >= 0:
+        x_a, x_b = x, x+32
+    else:
+        x_a, x_b = 0, 32+x
+
+    if y >= 0:
+        y_a, y_b = y, y+32
+    else:
+        y_a, y_b = 0, 32+y
+
+    r = np.array([ imresize(tr_images[:,:,i], (x_width,y_width))[x_a:x_b,y_a:y_b] for i in xrange(tr_images.shape[2]) ])
+    return np.rollaxis(r, 0, 3)
+    #return np.array([ np.asarray(Image.fromarray(tr_images[:,:,i]).resize((x_width,y_width)))[:,:] for i in xrange(tr_images.shape[2]) ])
 
 def evaluate_multiple(classifiers, tr_images, tr_labels):
     prediction_ensemble = []
@@ -79,14 +111,14 @@ def evaluate_multiple(classifiers, tr_images, tr_labels):
     print "Ensemble classification rate:", rate
     return rate, pred_voted
 
-def generate_test_labels(classifiers, tr_images, tr_labels, test_images):    
+def generate_test_labels(classifiers, tr_images, tr_labels, test_images):
     pred_ensemble_test = []
 
     for c in classifiers:
         fitted = c.fit(tr_images, tr_labels.ravel())
         pred = fitted.predict(test_images)
-        pred_ensemble_test.append(pred)  
-    
+        pred_ensemble_test.append(pred)
+
     #write test labels
     pred_ensemble_test = np.array(pred_ensemble_test)
     pred_test_voted = np.zeros(pred_ensemble_test.shape[1])
@@ -96,7 +128,7 @@ def generate_test_labels(classifiers, tr_images, tr_labels, test_images):
             t = d.get(k, 0)
             d[k] = t + 1
         pred_test_voted[i] = max(d.keys(), key=lambda x: d[x])
-        
+
     return pred_test_voted
 
 def train_multiple(classifiers, tr_images, tr_labels):
@@ -114,7 +146,7 @@ def fetch_classifier():
         #c = analyze.train_classifier()
         joblib.dump(c, 'classifier.pkl')
     return c
-    
+
 def cross_validations(classifier, images, labels, identity, nFold=10):
     d = {}
 
@@ -123,13 +155,13 @@ def cross_validations(classifier, images, labels, identity, nFold=10):
         t = d.get(identity[i][0], [])
         d[identity[i][0]] = t
         t.append(i)
-    
+
     #create folds
     folds = cross_validation.KFold(len(d.keys()), nFold)
-    
+
     scores = []
-    
-    #convert fold randomization into usable indicies    
+
+    #convert fold randomization into usable indicies
     for train_index, test_index in folds:
 
         tr_images = []
@@ -137,7 +169,7 @@ def cross_validations(classifier, images, labels, identity, nFold=10):
 
         val_images = []
         val_labels = []
-        
+
         imageIndex = [d.values()[i] for i in train_index.tolist()]
         for index in imageIndex:
             tr_images = tr_images + [images[i] for i in index]
@@ -147,21 +179,21 @@ def cross_validations(classifier, images, labels, identity, nFold=10):
         for index in imageIndex:
             val_images = val_images + [images[i] for i in index]
             val_labels = val_labels + [labels[i] for i in index]
-            
+
         tr_images = np.array(tr_images)
         tr_labels = np.array(tr_labels)
         val_images = np.array(val_images)
-        val_labels = np.array(val_labels)      
-        
+        val_labels = np.array(val_labels)
+
         trained = classifier.fit(tr_images, tr_labels.ravel())
-        
+
         score = trained.score(val_images, val_labels.ravel())
         scores.append(score)
-        
+
     scores = np.array(scores)
     print scores
     return np.average(scores)
-            
+
 
 def write_to_file(predictions):
     with open("csv.csv", 'w') as f:
@@ -186,16 +218,11 @@ if __name__ == '__main__':
         #tree.DecisionTreeClassifier(criterion="entropy"),
     ]
 
-    pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)    
+    pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
     write_to_file(pred_voted)
-    
+
     valid_score = cross_validations(classifiers[0], tr_images, tr_labels, tr_identity, nFold=10)
     print(valid_score)
     rate, pred_voted = evaluate_multiple(classifiers, tr_images, tr_labels)
-
-    
-
-
-
 
 

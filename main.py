@@ -53,6 +53,9 @@ def init_data():
         things_to_join = (tr_labels, tr_labels, tr_labels, tr_labels, tr_labels)
         tr_labels = np.concatenate(things_to_join)
 
+        things_to_join = (tr_identity, tr_identity, tr_identity, tr_identity, tr_identity)
+        tr_identity = np.concatenate(things_to_join)
+
     # Preprocess the training set
     tr_images = np.array([tr_images[:,:,i].reshape(-1) for i in xrange(tr_images.shape[2])])
     tr_images = preprocessing.scale(tr_images,1)
@@ -183,15 +186,20 @@ def cross_validations(classifier, images, labels, identity, nFold=10):
         val_images = []
         val_labels = []
 
+        print("start")
         imageIndex = [d.values()[i] for i in train_index.tolist()]
         for index in imageIndex:
             tr_images = tr_images + [images[i] for i in index]
             tr_labels = tr_labels + [labels[i] for i in index]
+            
+        print("something1")
 
         imageIndex = [d.values()[i] for i in test_index.tolist()]
         for index in imageIndex:
             val_images = val_images + [images[i] for i in index]
             val_labels = val_labels + [labels[i] for i in index]
+
+        print("something2")
 
         tr_images = np.array(tr_images)
         tr_labels = np.array(tr_labels)
@@ -231,12 +239,35 @@ if __name__ == '__main__':
         #naive_bayes.GaussianNB(),
         #tree.DecisionTreeClassifier(criterion="entropy"),
     ]
-
+    
     pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
     write_to_file(pred_voted)
 
-    valid_score = cross_validations(classifiers[0], tr_images, tr_labels, tr_identity, nFold=10)
+    valid_score = cross_validations(classifiers[0], tr_images, tr_labels, tr_identity, nFold=2)
     print(valid_score)
-    rate, pred_voted = evaluate_multiple(classifiers, tr_images, tr_labels)
+    #rate, pred_voted = evaluate_multiple(classifiers, tr_images, tr_labels)
+
+"""
+if __name__ == '__main__':
+    tr_images, tr_labels, tr_identity, test_images = init_data()
+    #labels = run_knn.run_knn(5, train_img, train_labels, train_img)
+
+    classifiers = [
+        neighbors.KNeighborsClassifier(),
+        #linear_model.RidgeClassifierCV(),
+        #neighbors.NearestNeighbors(n_neighbors=2, algorithm='ball_tree'),
+        #naive_bayes.GaussianNB(),
+        #tree.DecisionTreeClassifier(criterion="entropy"),
+    ]
+
+    #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)    
+    #write_to_file(pred_voted)
+    K=[3,4,5,6,7,8,9,10,15,20,35,50]
+    for k in K:
+        classifier = neighbors.KNeighborsClassifier(p=2, n_neighbors=k)
+        valid_score = cross_validations(classifier, tr_images, tr_labels, tr_identity, nFold=5)
+        print "valid_score: "+str(valid_score) +"k: " + str(k)
 
 
+    #rate, pred_voted = evaluate_multiple(classifiers, tr_images, tr_labels)
+"""

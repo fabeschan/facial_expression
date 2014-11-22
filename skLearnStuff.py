@@ -28,6 +28,37 @@ def train_classifier(classifier=None):
     return classifier_fit
 '''
 
+def train_classifier(data, target, classifier, verbose=True):
+    ''' Return a trained classifier '''
+
+    X_digits = data
+    y_digits = target
+
+    n_samples = len(X_digits)
+    proportion = 1.0 # train all examples
+
+    # data
+    X_train = X_digits[:proportion * n_samples]
+    y_train = y_digits[:proportion * n_samples]
+
+    # truths/target
+    X_test = X_digits[proportion * n_samples:]
+    y_test = y_digits[proportion * n_samples:]
+
+    classifier_fit = classifier.fit(X_train, y_train)
+    return classifier_fit
+
+def evaluate(test_data, test_target, trained_classifier, verbose=True):
+
+    pred = trained_classifier.predict(test_data)
+    score = trained_classifier.score(test_data, test_target)
+    if verbose:
+    #    print 'TRUTH:', y_test
+    #    print 'PREDN:', pred
+        print ('Classifier score: %f' % score)
+
+    return score, pred
+
 def test(d, t, classifier=None, verbose=True):
     sdata = data()
     sdata.data, sdata.target = d, t

@@ -20,14 +20,14 @@ tr_images = imagesDic["tr_images"].astype(float)
 tr_identity = imagesDic["tr_identity"].astype(float)
 tr_labels = imagesDic["tr_labels"]
 
-imagesDic = scipy.io.loadmat(file_name="public_test_images.mat")
-test_images = imagesDic["public_test_images"].astype(float)
-
 tr_images = np.array([tr_images[:,:,i].reshape(-1) for i in xrange(tr_images.shape[2])])
 tr_images = preprocessing.scale(tr_images,1)
 
 
-nTrainExample = 2162
+imagesDic = scipy.io.loadmat(file_name="public_test_images.mat")
+test_images = imagesDic["public_test_images"].astype(float)
+test_images = np.array([test_images[:,:,i].reshape(-1) for i in xrange(test_images.shape[2])])
+test_images = preprocessing.scale(test_images,1)
 
 """
 train_img = tr_images[:nTrainExample,:]
@@ -64,36 +64,60 @@ classifiers = [
     #tree.DecisionTreeClassifier(criterion="entropy"),
 ]
 
-pred_ensemble = []
+pred_ensemble_validation = []
+pred_ensemble_test = []
 
 for c in classifiers:
     score, pred, y_test = skLearnStuff.test(tr_images, tr_labels.ravel(), classifier=c, verbose=True)
-    pred_ensemble.append(pred)
+    pred_ensemble_validation.append(pred)
+    
+    classifier_fit = c.fit(tr_images, tr_labels.ravel())
+    pred = classifier_fit.predict(test_images)
+    pred_ensemble_test.append(pred)
 
-pred_ensemble = np.array(pred_ensemble)
-pred_voted = np.zeros(pred_ensemble.shape[1])
-for i in range(pred_ensemble.shape[1]):
+
+#calculate validation rates    
+pred_ensemble_validation = np.array(pred_ensemble_validation)
+
+pred_valid_voted = np.zeros(pred_ensemble_validation.shape[1])
+for i in range(pred_ensemble_validation.shape[1]):
     d = {}
-    for k in pred_ensemble[:,i]:
+    for k in pred_ensemble_validation[:,i]:
         t = d.get(k, 0)
         d[k] = t + 1
-    pred_voted[i] = max(d.keys(), key=lambda x: d[x])
+    pred_valid_voted[i] = max(d.keys(), key=lambda x: d[x])
 
-print pred_voted
+print pred_valid_voted
 valid_labels = tr_labels[0.85 * tr_labels.size:]
-
-false_count = np.flatnonzero(valid_labels.reshape(-1) - pred_voted.reshape(-1)).size
+false_count = np.flatnonzero(valid_labels.reshape(-1) - pred_valid_voted.reshape(-1)).size
 rate = float(valid_labels.size - false_count)/valid_labels.size
 print(rate)
 
 
-def write_to_file(predictions):
-    with open("csv.csv", 'w') as f:
+#write test labels
+pred_ensemble_test = np.array(pred_ensemble_test)
+pred_test_voted = np.zeros(pred_ensemble_test.shape[1])
+for i in range(pred_ensemble_test.shape[1]):
+    d = {}
+    for k in pred_ensemble_test[:,i]:
+        t = d.get(k, 0)
+        d[k] = t + 1
+    pred_test_voted[i] = max(d.keys(), key=lambda x: d[x])
+
+
+def write_to_file(predictions,name="predictions"):
+    with open(name+".csv", 'w') as f:
         f.write("id,prediction\n")
-        for i in range(len(predictions)):
-            s = "{},{}\n".format(i+1, predictions[i])            
+        for i in range(1253):
+            if i <len(predictions):
+                s = "{},{}\n".format(i+1, int(predictions[i]))            
+            else:
+                s = "{},{}\n".format(i+1, 0)
             f.write(s)
 
+write_to_file(pred_test_voted)
 
-a = ['2','3','4','1','2','3']
-write_to_file(pred_voted)
+
+
+#a = ['2','3','4','1','2','3']
+#write_to_file(pred_voted)

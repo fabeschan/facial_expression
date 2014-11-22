@@ -67,7 +67,7 @@ classifiers = [
 pred_ensemble = []
 
 for c in classifiers:
-    score, pred, y_test = skLearnStuff.test(train_img, train_labels.ravel(), classifier=c, verbose=True)
+    score, pred, y_test = skLearnStuff.test(tr_images, tr_labels.ravel(), classifier=c, verbose=True)
     pred_ensemble.append(pred)
 
 pred_ensemble = np.array(pred_ensemble)
@@ -80,7 +80,7 @@ for i in range(pred_ensemble.shape[1]):
     pred_voted[i] = max(d.keys(), key=lambda x: d[x])
 
 print pred_voted
-valid_labels = train_labels[0.85 * train_labels.size:]
+valid_labels = tr_labels[0.85 * tr_labels.size:]
 
 false_count = np.flatnonzero(valid_labels.reshape(-1) - pred_voted.reshape(-1)).size
 rate = float(valid_labels.size - false_count)/valid_labels.size

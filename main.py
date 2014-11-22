@@ -56,6 +56,26 @@ def init_data():
         things_to_join = (tr_identity, tr_identity, tr_identity, tr_identity, tr_identity)
         tr_identity = np.concatenate(things_to_join)
 
+    ADD_TRANSFORMED_DATA_2 = False
+    if ADD_TRANSFORMED_DATA_2:
+        tr_images_0_1 = transform_(tr_images, 0, 1)
+        tr_images_0_m1 = transform_(tr_images, 0, -1)
+        tr_images_1_0 = transform_(tr_images, 1, 0)
+        tr_images_m1_0 = transform_(tr_images, -1, 0)
+        tr_images_0_2 = transform_(tr_images, 0, 2)
+        tr_images_0_m2 = transform_(tr_images, 0, -2)
+        tr_images_2_0 = transform_(tr_images, 2, 0)
+        tr_images_m2_0 = transform_(tr_images, -2, 0)
+
+        things_to_join = (tr_images, tr_images_0_1, tr_images_0_m1,  tr_images_1_0, tr_images_m1_0, tr_images_0_2, tr_images_0_m2,  tr_images_2_0, tr_images_m2_0)
+        tr_images = np.concatenate(things_to_join, axis=2)
+
+        things_to_join = (tr_labels, tr_labels, tr_labels, tr_labels, tr_labels, tr_labels, tr_labels, tr_labels, tr_labels)
+        tr_labels = np.concatenate(things_to_join)
+
+        things_to_join = (tr_identity, tr_identity, tr_identity, tr_identity, tr_identity, tr_identity, tr_identity, tr_identity, tr_identity)
+        tr_identity = np.concatenate(things_to_join)
+
     # Preprocess the training set
     tr_images = np.array([tr_images[:,:,i].reshape(-1) for i in xrange(tr_images.shape[2])])
     tr_images = preprocessing.scale(tr_images,1)
@@ -130,10 +150,13 @@ def evaluate_multiple(classifiers, tr_images, tr_labels):
 def generate_test_labels(classifiers, tr_images, tr_labels, test_images):
     pred_ensemble_test = []
 
+    i = 1
     for c in classifiers:
         fitted = c.fit(tr_images, tr_labels.ravel())
         pred = fitted.predict(test_images)
         pred_ensemble_test.append(pred)
+        print "Finished evaluating {}/{} classifiers".format(i, len(classifiers))
+        i += 1
 
     #write test labels
     pred_ensemble_test = np.array(pred_ensemble_test)
@@ -191,7 +214,7 @@ def cross_validations(classifier, images, labels, identity, nFold=10):
         for index in imageIndex:
             tr_images = tr_images + [images[i] for i in index]
             tr_labels = tr_labels + [labels[i] for i in index]
-            
+
         print("something1")
 
         imageIndex = [d.values()[i] for i in test_index.tolist()]
@@ -233,17 +256,18 @@ if __name__ == '__main__':
     #labels = run_knn.run_knn(5, train_img, train_labels, train_img)
 
     classifiers = [
-        neighbors.KNeighborsClassifier(p=2),
+        #neighbors.KNeighborsClassifier(n_neighbors=8, p=2),
+        #svm.SVC(),
         #linear_model.RidgeClassifierCV(),
         #neighbors.NearestNeighbors(n_neighbors=2, algorithm='ball_tree'),
         #naive_bayes.GaussianNB(),
-        #tree.DecisionTreeClassifier(criterion="entropy"),
+        tree.DecisionTreeClassifier(criterion="entropy"),
     ]
-    
-    pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
-    write_to_file(pred_voted)
 
-    valid_score = cross_validations(classifiers[0], tr_images, tr_labels, tr_identity, nFold=2)
+    #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
+    #write_to_file(pred_voted)
+
+    valid_score = cross_validations(classifiers[0], tr_images, tr_labels, tr_identity, nFold=5)
     print(valid_score)
     #rate, pred_voted = evaluate_multiple(classifiers, tr_images, tr_labels)
 
@@ -260,7 +284,7 @@ if __name__ == '__main__':
         #tree.DecisionTreeClassifier(criterion="entropy"),
     ]
 
-    #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)    
+    #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
     #write_to_file(pred_voted)
     K=[3,4,5,6,7,8,9,10,15,20,35,50]
     for k in K:

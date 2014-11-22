@@ -30,7 +30,7 @@ def init_data():
 
     SHOW_TRANSFORM_COMPARISON = False
     if SHOW_TRANSFORM_COMPARISON:
-        trtr = transform_(tr_images, 4, 4)
+        trtr = transform_(tr_images, 0, 4)
         plt.figure(1)
         plt.clf()
         plt.imshow(trtr[:,:,0], cmap=plt.cm.gray)
@@ -39,6 +39,20 @@ def init_data():
         plt.clf()
         plt.imshow(tr_images[:,:,0], cmap=plt.cm.gray)
         plt.show()
+
+    ADD_TRANSFORMED_DATA = True
+    if ADD_TRANSFORMED_DATA:
+        tr_images_0_1 = transform_(tr_images, 0, 1)
+        tr_images_0_m1 = transform_(tr_images, 0, -1)
+        tr_images_1_0 = transform_(tr_images, 1, 0)
+        tr_images_m1_0 = transform_(tr_images, -1, 0)
+
+        things_to_join = (tr_images, tr_images_0_1, tr_images_0_m1,  tr_images_1_0, tr_images_m1_0)
+        tr_images = np.concatenate(things_to_join, axis=2)
+
+        things_to_join = (tr_labels, tr_labels, tr_labels, tr_labels, tr_labels)
+        tr_labels = np.concatenate(things_to_join)
+
     # Preprocess the training set
     tr_images = np.array([tr_images[:,:,i].reshape(-1) for i in xrange(tr_images.shape[2])])
     tr_images = preprocessing.scale(tr_images,1)
@@ -74,12 +88,14 @@ def transform_(tr_images, x, y):
     if x >= 0:
         x_a, x_b = x, x+32
     else:
-        x_a, x_b = 0, 32+x
+        x_a, x_b = 0, 32
+    x_a, x_b = 0, 32
 
     if y >= 0:
         y_a, y_b = y, y+32
     else:
-        y_a, y_b = 0, 32+y
+        y_a, y_b = 0, 32
+    y_a, y_b = 0, 32
 
     r = np.array([ imresize(tr_images[:,:,i], (x_width,y_width))[x_a:x_b,y_a:y_b] for i in xrange(tr_images.shape[2]) ])
     return np.rollaxis(r, 0, 3)
@@ -208,6 +224,7 @@ def write_to_file(predictions):
 
 if __name__ == '__main__':
     tr_images, tr_labels, tr_identity, test_images = init_data()
+
     #labels = run_knn.run_knn(5, train_img, train_labels, train_img)
 
     classifiers = [

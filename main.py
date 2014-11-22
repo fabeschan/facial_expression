@@ -31,6 +31,9 @@ def init_data():
     tr_images = np.array([tr_images[:,:,i].reshape(-1) for i in xrange(tr_images.shape[2])])
     tr_images = preprocessing.scale(tr_images,1)
 
+    # Preprocess the test set
+    test_images = np.array([test_images[:,:,i].reshape(-1) for i in xrange(test_images.shape[2])])
+    test_images = preprocessing.scale(test_images,1)
     return tr_images, tr_labels, tr_identity, test_images
 
 """
@@ -51,7 +54,6 @@ plt.show()
 """
 
 def evaluate_multiple(classifiers, tr_images, tr_labels):
-
     prediction_ensemble = []
     train_vs_valid_proportion = 0.85
     n_train = train_vs_valid_proportion * len(tr_images)
@@ -76,6 +78,26 @@ def evaluate_multiple(classifiers, tr_images, tr_labels):
     rate = float(valid_labels.size - false_count)/valid_labels.size
     print "Ensemble classification rate:", rate
     return rate, pred_voted
+
+def generate_test_labels(classifiers, tr_images, tr_labels, test_images):    
+    pred_ensemble_test = []
+
+    for c in classifiers:
+        fitted = c.fit(tr_images, tr_labels.ravel())
+        pred = fitted.predict(test_images)
+        pred_ensemble_test.append(pred)  
+    
+    #write test labels
+    pred_ensemble_test = np.array(pred_ensemble_test)
+    pred_test_voted = np.zeros(pred_ensemble_test.shape[1])
+    for i in range(pred_ensemble_test.shape[1]):
+        d = {}
+        for k in pred_ensemble_test[:,i]:
+            t = d.get(k, 0)
+            d[k] = t + 1
+        pred_test_voted[i] = max(d.keys(), key=lambda x: d[x])
+        
+    return pred_test_voted
 
 def train_multiple(classifiers, tr_images, tr_labels):
     pass
@@ -144,9 +166,13 @@ def cross_validations(classifier, images, labels, identity, nFold=10):
 def write_to_file(predictions):
     with open("csv.csv", 'w') as f:
         f.write("id,prediction\n")
-        for i in range(len(predictions)):
-            s = "{},{}\n".format(i+1, predictions[i])
-            f.write(s)
+        for i in range(1253):
+            if i < len(predictions):
+                s = "{},{}\n".format(i+1, int(predictions[i]))
+                f.write(s)
+            else:
+                s = "{},{}\n".format(i+1, 0)
+                f.write(s)
 
 if __name__ == '__main__':
     tr_images, tr_labels, tr_identity, test_images = init_data()
@@ -159,8 +185,17 @@ if __name__ == '__main__':
         #naive_bayes.GaussianNB(),
         #tree.DecisionTreeClassifier(criterion="entropy"),
     ]
+
+    pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)    
+    write_to_file(pred_voted)
     
     valid_score = cross_validations(classifiers[0], tr_images, tr_labels, tr_identity, nFold=10)
     print(valid_score)
     rate, pred_voted = evaluate_multiple(classifiers, tr_images, tr_labels)
-    write_to_file(pred_voted)
+
+    
+
+
+
+
+

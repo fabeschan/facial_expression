@@ -92,14 +92,7 @@ def fetch_classifier():
         #c = analyze.train_classifier()
         joblib.dump(c, 'classifier.pkl')
     return c
-
-def write_to_file(predictions):
-    with open("csv.csv", 'w') as f:
-        f.write("id,prediction\n")
-        for i in range(len(predictions)):
-            s = "{},{}\n".format(i+1, predictions[i])
-            f.write(s)
-
+    
 def cross_validations(classifier, images, labels, identity, nFold=10):
     d = {}
 
@@ -147,12 +140,14 @@ def cross_validations(classifier, images, labels, identity, nFold=10):
     print scores
     return np.average(scores)
             
-        
-    
-#        images_folds.append(images[d[indicies]])
-#        labels_folds.append(labels[d[indicies]])
-        
-    
+
+def write_to_file(predictions):
+    with open("csv.csv", 'w') as f:
+        f.write("id,prediction\n")
+        for i in range(len(predictions)):
+            s = "{},{}\n".format(i+1, predictions[i])
+            f.write(s)
+
 if __name__ == '__main__':
     tr_images, tr_labels, tr_identity, test_images = init_data()
     #labels = run_knn.run_knn(5, train_img, train_labels, train_img)
@@ -164,7 +159,8 @@ if __name__ == '__main__':
         #naive_bayes.GaussianNB(),
         #tree.DecisionTreeClassifier(criterion="entropy"),
     ]
-    score = cross_validations(classifiers[0], tr_images, tr_labels, tr_identity, nFold = 10)
-    print "Validation Score: "+str(score)
+    
+    valid_score = cross_validations(classifiers[0], tr_images, tr_labels, tr_identity, nFold=10)
+    print(valid_score)
     rate, pred_voted = evaluate_multiple(classifiers, tr_images, tr_labels)
     write_to_file(pred_voted)

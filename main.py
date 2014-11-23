@@ -14,9 +14,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn import cross_validation
 from sklearn import datasets, neighbors, linear_model, svm, naive_bayes, tree
-from sklearn.ensemble import BaggingClassifier, RandomForestClassifier
-from sklearn import preprocessing
+from sklearn.ensemble import BaggingClassifier, RandomForestClassifier, AdaBoostClassifier
+from sklearn import preprocessing, cluster
 import run_knn, skLearnStuff
+import random
 
 def init_data():
 
@@ -42,7 +43,7 @@ def init_data():
         plt.imshow(tr_images[:,:,0], cmap=plt.cm.gray)
         plt.show()
 
-    ADD_TRANSFORMED_DATA = False
+    ADD_TRANSFORMED_DATA = True
     if ADD_TRANSFORMED_DATA:
         tr_images_0_1 = transform_(tr_images, 0, 1)
         tr_images_0_m1 = transform_(tr_images, 0, -1)
@@ -193,9 +194,7 @@ def cross_validations(images, labels, identity, nFold=5):
         t.append(i)
 
     #create folds
-    folds = cross_validation.KFold(len(d.keys()), nFold)
-
-    scores = []
+    folds = cross_validation.KFold(len(d.keys()), nFold, shuffle = True)
 
     #convert fold randomization into usable indicies
     for train_index, test_index in folds:
@@ -239,6 +238,18 @@ if __name__ == '__main__':
 
     #labels = run_knn.run_knn(5, train_img, train_labels, train_img)
 
+    nCluster = 15
+    
+
+    kmean = cluster.KMeans(n_clusters=nCluster, n_jobs = 8)
+    train_clusters = kmean.fit_predict(tr_images)
+    test_clusters = kmean.predict(test_images)
+    
+    clusters = []
+    for i in range(nCluster):
+        index = np.nonzero(train_clusters==i)[0]
+        clusters.append(index)
+        
     knn_bagging = BaggingClassifier(
         neighbors.KNeighborsClassifier(p=2),
         n_estimators=45,
@@ -256,23 +267,29 @@ if __name__ == '__main__':
         bootstrap_features=False,
         n_jobs=8,
         )
+        
+    adaboost = AdaBoostClassifier(tree.DecisionTreeClassifier(max_depth=2),
+                         algorithm="SAMME",
+                         n_estimators=200)
 
     classifiers = [
         #neighbors.KNeighborsClassifier(n_neighbors=8, p=2),
         svm.SVC(),
         knn_bagging,
-        #linear_model.RidgeClassifierCV(),
+        #linear_model.LogisticRegression(C=.01),
+        linear_model.RidgeClassifierCV(),
         #neighbors.NearestNeighbors(n_neighbors=2, algorithm='ball_tree'),
-        #naive_bayes.GaussianNB(),
+        naive_bayes.GaussianNB(),
         #tree.DecisionTreeClassifier(criterion="entropy"),
-        trees_bagging,
+        adaboost,
+        #trees_bagging,
         RandomForestClassifier(n_estimators=60),
     ]
 
     #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
     #write_to_file(pred_voted)
 
-    validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5)
+    #validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5)
 
 """
 if __name__ == '__main__':

@@ -14,8 +14,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn import cross_validation
 from sklearn import datasets, neighbors, linear_model, svm, naive_bayes, tree
-from sklearn.ensemble import BaggingClassifier, RandomForestClassifier
+from sklearn.ensemble import BaggingClassifier, RandomForestClassifier, AdaBoostClassifier
 from sklearn import preprocessing
+from sklearn.decomposition import PCA
 import run_knn, skLearnStuff
 
 def init_data():
@@ -85,6 +86,17 @@ def init_data():
     # Preprocess the test set
     test_images = np.array([test_images[:,:,i].reshape(-1) for i in xrange(test_images.shape[2])])
     test_images = preprocessing.scale(test_images,1)
+
+    # PCA reduction/projection
+    if True:
+        dim = 65
+        pca = PCA(n_components=dim)
+        tr_images = pca.fit_transform(tr_images)
+
+        pca_ = PCA(n_components=dim)
+        test_images = pca.fit_transform(test_images)
+        print "PCA Total explained variance:", np.sum(pca.explained_variance_ratio_)
+
     return tr_images, tr_labels, tr_identity, test_images
 
 """
@@ -105,19 +117,19 @@ plt.show()
 """
 
 def transform_(tr_images, x, y):
-    x_width = 32 + abs(x)
-    y_width = 32 + abs(y)
+    x_width = tr_images.shape[0] + abs(x)
+    y_width = tr_images.shape[1] + abs(y)
 
     # x_a, x_b, y_a, y_b are the limits
     if x >= 0:
-        x_a, x_b = x, x+32
+        x_a, x_b = x, x+tr_images.shape[0]
     else:
-        x_a, x_b = 0, 32
+        x_a, x_b = 0, tr_images.shape[0]
 
     if y >= 0:
-        y_a, y_b = y, y+32
+        y_a, y_b = y, y+tr_images.shape[1]
     else:
-        y_a, y_b = 0, 32
+        y_a, y_b = 0, tr_images.shape[1]
 
     r = np.array([ imresize(tr_images[:,:,i], (x_width,y_width))[x_a:x_b,y_a:y_b] for i in xrange(tr_images.shape[2]) ])
     return np.rollaxis(r, 0, 3)
@@ -130,6 +142,7 @@ def validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5):
     for nfold_tr_images, nfold_tr_labels, nfold_val_images, nfold_val_labels in cross_validations(tr_images, tr_labels, tr_identity, nFold=nFold):
         prediction_ensemble = []
         for c in classifiers:
+
             trained = c.fit(nfold_tr_images, nfold_tr_labels.ravel())
             pred = trained.predict(nfold_val_images).ravel()
             prediction_ensemble.append(pred)
@@ -193,7 +206,7 @@ def cross_validations(images, labels, identity, nFold=5):
         t.append(i)
 
     #create folds
-    folds = cross_validation.KFold(len(d.keys()), nFold)
+    folds = cross_validation.KFold(len(d.keys()), nFold, shuffle=True)
 
     scores = []
 
@@ -221,7 +234,6 @@ def cross_validations(images, labels, identity, nFold=5):
         val_labels = np.array(val_labels)
 
         yield tr_images, tr_labels, val_images, val_labels
-
 
 def write_to_file(predictions):
     with open("csv.csv", 'w') as f:
@@ -257,22 +269,31 @@ if __name__ == '__main__':
         n_jobs=8,
         )
 
+    bdt_real = AdaBoostClassifier(
+        tree.DecisionTreeClassifier(max_depth=2),
+        n_estimators=200,
+        learning_rate=1,
+        algorithm="SAMME.R",
+        )
+
     classifiers = [
-        #neighbors.KNeighborsClassifier(n_neighbors=8, p=2),
-        svm.SVC(),
-        knn_bagging,
+        #neighbors.KNeighborsClassifier(n_neighbors=5, p=2),
+        #svm.SVC(),
+        #knn_bagging,
         #linear_model.RidgeClassifierCV(),
         #neighbors.NearestNeighbors(n_neighbors=2, algorithm='ball_tree'),
         #naive_bayes.GaussianNB(),
         #tree.DecisionTreeClassifier(criterion="entropy"),
-        trees_bagging,
-        RandomForestClassifier(n_estimators=60),
+        #trees_bagging,
+        #RandomForestClassifier(n_estimators=150),
+        #AdaBoostClassifier(n_estimators=100),
+        bdt_real,
     ]
 
     #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
     #write_to_file(pred_voted)
 
-    validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5)
+    validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=8)
 
 """
 if __name__ == '__main__':

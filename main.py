@@ -187,10 +187,10 @@ def fetch_classifier():
         joblib.dump(c, 'classifier.pkl')
     return c
 
-def cross_validations(classifier, images, labels, identity, nFold=10):
-    d = {}
+def cross_validations(images, labels, identity, nFold=10):
 
     #create dictionary of {identities: indicies of corresponding labels}
+    d = {}
     for i in range(len(identity)):
         t = d.get(identity[i][0], [])
         d[identity[i][0]] = t
@@ -206,38 +206,25 @@ def cross_validations(classifier, images, labels, identity, nFold=10):
 
         tr_images = []
         tr_labels = []
-
         val_images = []
         val_labels = []
 
-        print("start")
         imageIndex = [d.values()[i] for i in train_index.tolist()]
         for index in imageIndex:
             tr_images = tr_images + [images[i] for i in index]
             tr_labels = tr_labels + [labels[i] for i in index]
-
-        print("something1")
 
         imageIndex = [d.values()[i] for i in test_index.tolist()]
         for index in imageIndex:
             val_images = val_images + [images[i] for i in index]
             val_labels = val_labels + [labels[i] for i in index]
 
-        print("something2")
-
         tr_images = np.array(tr_images)
         tr_labels = np.array(tr_labels)
         val_images = np.array(val_images)
         val_labels = np.array(val_labels)
 
-        trained = classifier.fit(tr_images, tr_labels.ravel())
-
-        score = trained.score(val_images, val_labels.ravel())
-        scores.append(score)
-
-    scores = np.array(scores)
-    print scores
-    return np.average(scores)
+        yield tr_images, tr_labels, val_images, val_labels
 
 
 def write_to_file(predictions):
@@ -259,8 +246,8 @@ if __name__ == '__main__':
     knn_bagging = BaggingClassifier(
         neighbors.KNeighborsClassifier(p=2),
         n_estimators=45,
-        max_samples=0.5,
-        max_features=0.5,
+        max_samples=0.3,
+        max_features=0.4,
         bootstrap_features=True,
         n_jobs=8,
         )
@@ -268,28 +255,37 @@ if __name__ == '__main__':
     trees_bagging = BaggingClassifier(
         tree.DecisionTreeClassifier(criterion="entropy", max_depth=2),
         n_estimators=45,
-        max_samples=0.5,
-        max_features=0.5,
+        max_samples=0.3,
+        max_features=0.4,
         bootstrap_features=False,
         n_jobs=8,
         )
 
     classifiers = [
         #neighbors.KNeighborsClassifier(n_neighbors=8, p=2),
-        svm.SVC(),
+        #svm.SVC(),
         knn_bagging,
         #linear_model.RidgeClassifierCV(),
         #neighbors.NearestNeighbors(n_neighbors=2, algorithm='ball_tree'),
         #naive_bayes.GaussianNB(),
         #tree.DecisionTreeClassifier(criterion="entropy"),
         #trees_bagging,
-        RandomForestClassifier(n_estimators=60),
+        #RandomForestClassifier(n_estimators=60),
     ]
 
     #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
     #write_to_file(pred_voted)
 
-    valid_score = cross_validations(classifiers[0], tr_images, tr_labels, tr_identity, nFold=5)
+    NFOLD = 5
+    valid_score = 0.0
+    j = 1
+    for nfold_tr_images, nfold_tr_labels, nfold_val_images, nfold_val_labels in cross_validations(tr_images, tr_labels, tr_identity, nFold=NFOLD):
+        trained = classifiers[0].fit(nfold_tr_images, nfold_tr_labels.ravel())
+        valid_score_ = trained.score(nfold_val_images, nfold_val_labels)
+        valid_score += valid_score_ / NFOLD
+        print "K-fold validation: completed {}/{} folds (fold score: {})".format(j, NFOLD, valid_score_)
+        j += 1
+
     print(valid_score)
     #rate, pred_voted = evaluate_multiple(classifiers, tr_images, tr_labels)
 

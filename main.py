@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn import cross_validation
 from sklearn import datasets, neighbors, linear_model, svm, naive_bayes, tree
+from sklearn.ensemble import BaggingClassifier, RandomForestClassifier
 from sklearn import preprocessing
 import run_knn, skLearnStuff
 
@@ -40,7 +41,7 @@ def init_data():
         plt.imshow(tr_images[:,:,0], cmap=plt.cm.gray)
         plt.show()
 
-    ADD_TRANSFORMED_DATA = True
+    ADD_TRANSFORMED_DATA = False
     if ADD_TRANSFORMED_DATA:
         tr_images_0_1 = transform_(tr_images, 0, 1)
         tr_images_0_m1 = transform_(tr_images, 0, -1)
@@ -255,13 +256,34 @@ if __name__ == '__main__':
 
     #labels = run_knn.run_knn(5, train_img, train_labels, train_img)
 
+    knn_bagging = BaggingClassifier(
+        neighbors.KNeighborsClassifier(p=2),
+        n_estimators=45,
+        max_samples=0.5,
+        max_features=0.5,
+        bootstrap_features=True,
+        n_jobs=8,
+        )
+
+    trees_bagging = BaggingClassifier(
+        tree.DecisionTreeClassifier(criterion="entropy", max_depth=2),
+        n_estimators=45,
+        max_samples=0.5,
+        max_features=0.5,
+        bootstrap_features=False,
+        n_jobs=8,
+        )
+
     classifiers = [
         #neighbors.KNeighborsClassifier(n_neighbors=8, p=2),
-        #svm.SVC(),
+        svm.SVC(),
+        knn_bagging,
         #linear_model.RidgeClassifierCV(),
         #neighbors.NearestNeighbors(n_neighbors=2, algorithm='ball_tree'),
         #naive_bayes.GaussianNB(),
-        tree.DecisionTreeClassifier(criterion="entropy"),
+        #tree.DecisionTreeClassifier(criterion="entropy"),
+        #trees_bagging,
+        RandomForestClassifier(n_estimators=60),
     ]
 
     #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)

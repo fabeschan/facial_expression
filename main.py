@@ -44,7 +44,7 @@ def init_data():
         plt.imshow(tr_images[:,:,0], cmap=plt.cm.gray)
         plt.show()
 
-    ADD_TRANSFORMED_DATA = True
+    ADD_TRANSFORMED_DATA = False
     if ADD_TRANSFORMED_DATA:
         tr_images_0_1 = transform_(tr_images, 0, 1)
         tr_images_0_m1 = transform_(tr_images, 0, -1)
@@ -90,7 +90,7 @@ def init_data():
 
     # PCA reduction/projection
     if True:
-        dim = 65
+        dim = 50
         pca = PCA(n_components=dim)
         tr_images = pca.fit_transform(tr_images)
 
@@ -151,7 +151,7 @@ def validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5):
         prediction_ensemble = np.array(prediction_ensemble)
         pred_voted = stats.mode(prediction_ensemble, axis=0)[0]
         valid_score_ = np.sum(pred_voted.ravel() == nfold_val_labels.ravel()) / float(nfold_val_labels.size)
-        valid_score += valid_score_ / nFold
+        valid_score += valid_score_ * (1 - float(nfold_tr_labels.size) / tr_labels.size)
         print "validate_multiple: completed {}/{} folds (fold score: {})".format(j, nFold, valid_score_)
         j += 1
 
@@ -250,20 +250,8 @@ if __name__ == '__main__':
 
     #labels = run_knn.run_knn(5, train_img, train_labels, train_img)
 
-    nCluster = 15
-
-
-    kmean = cluster.KMeans(n_clusters=nCluster, n_jobs = 8)
-    train_clusters = kmean.fit_predict(tr_images)
-    test_clusters = kmean.predict(test_images)
-
-    clusters = []
-    for i in range(nCluster):
-        index = np.nonzero(train_clusters==i)[0]
-        clusters.append(index)
-
     knn_bagging = BaggingClassifier(
-        neighbors.KNeighborsClassifier(p=2),
+        neighbors.KNeighborsClassifier(n_neighbors=5, p=2),
         n_estimators=45,
         max_samples=0.3,
         max_features=0.4,
@@ -285,31 +273,56 @@ if __name__ == '__main__':
                          n_estimators=200)
 
     bdt_real = AdaBoostClassifier(
-        tree.DecisionTreeClassifier(max_depth=2),
+        tree.DecisionTreeClassifier(max_depth=1),
         n_estimators=200,
         learning_rate=1,
         algorithm="SAMME.R",
         )
 
-    classifiers = [
-        #neighbors.KNeighborsClassifier(n_neighbors=8, p=2),
-        svm.SVC(),
-        knn_bagging,
-        #linear_model.LogisticRegression(C=.01),
+    ridgeCV_ada = AdaBoostClassifier(
         linear_model.RidgeClassifierCV(),
-        naive_bayes.GaussianNB(),
+        n_estimators=200,
+        learning_rate=1,
+        algorithm="SAMME",
+        )
+
+    classifiers = [
+        #neighbors.KNeighborsClassifier(n_neighbors=7, p=2),
+        #svm.SVC(),
+        #knn_bagging,
+        #linear_model.LogisticRegression(C=.01),
+        #linear_model.RidgeClassifierCV(),
+        #ridgeCV_ada,
+        #naive_bayes.GaussianNB(),
         #tree.DecisionTreeClassifier(criterion="entropy"),
         #trees_bagging,
         #RandomForestClassifier(n_estimators=150),
         #AdaBoostClassifier(n_estimators=100),
         bdt_real,
-        adaboost,
+        #adaboost,
     ]
+
+    if False:
+        nCluster = 15
+        #kmean = cluster.KMeans(n_clusters=nCluster, n_jobs=8)
+        kmean = cluster.MiniBatchKMeans(n_clusters=nCluster, batch_size=30, n_init=12)
+        train_clusters = kmean.fit_predict(tr_images)
+        test_clusters = kmean.predict(test_images)
+
+        #clusters = []
+        #for i in range(nCluster):
+        #    index = np.nonzero(train_clusters==i)[0]
+        #    clusters.append(index)
+        print (train_clusters==0).shape
+        tr_images = tr_images[train_clusters==0]
+        tr_labels = tr_labels[train_clusters==0]
+        print (tr_labels==0).shape
+        tr_identity = tr_identity[train_clusters==0]
 
     #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
     #write_to_file(pred_voted)
 
-    validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=8)
+    validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=6)
 
 """
 if __name__ == '__main__':

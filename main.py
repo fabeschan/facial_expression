@@ -18,7 +18,7 @@ from sklearn.ensemble import BaggingClassifier, RandomForestClassifier, AdaBoost
 from sklearn import preprocessing, cluster
 from sklearn.decomposition import PCA
 import run_knn, skLearnStuff
-import random
+import time
 
 def init_data():
 
@@ -249,6 +249,7 @@ if __name__ == '__main__':
     tr_images, tr_labels, tr_identity, test_images = init_data()
 
     #labels = run_knn.run_knn(5, train_img, train_labels, train_img)
+ 
 
     knn_bagging = BaggingClassifier(
         neighbors.KNeighborsClassifier(n_neighbors=5, p=2),
@@ -290,7 +291,7 @@ if __name__ == '__main__':
         #neighbors.KNeighborsClassifier(n_neighbors=7, p=2),
         #svm.SVC(),
         #knn_bagging,
-        #linear_model.LogisticRegression(C=.01),
+        linear_model.LogisticRegression(C=.01),
         #linear_model.RidgeClassifierCV(),
         #ridgeCV_ada,
         #naive_bayes.GaussianNB(),
@@ -298,7 +299,7 @@ if __name__ == '__main__':
         #trees_bagging,
         #RandomForestClassifier(n_estimators=150),
         #AdaBoostClassifier(n_estimators=100),
-        bdt_real,
+        #bdt_real,
         #adaboost,
     ]
 
@@ -309,20 +310,30 @@ if __name__ == '__main__':
         train_clusters = kmean.fit_predict(tr_images)
         test_clusters = kmean.predict(test_images)
 
-        #clusters = []
-        #for i in range(nCluster):
-        #    index = np.nonzero(train_clusters==i)[0]
-        #    clusters.append(index)
-        print (train_clusters==0).shape
-        tr_images = tr_images[train_clusters==0]
-        tr_labels = tr_labels[train_clusters==0]
-        print (tr_labels==0).shape
-        tr_identity = tr_identity[train_clusters==0]
-
-    #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
-    #write_to_file(pred_voted)
-
-    validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=6)
+        clusters = []
+        final_score = 0;
+        pred_counter = 0;
+        for i in range(nCluster):
+            cluster_index = train_clusters==i
+            cluster_images = tr_images[cluster_index]
+            cluster_labels = tr_labels[cluster_index]
+            cluster_identity = tr_identity[cluster_index]
+            start = time.time()
+            score, pred = validate_multiple(classifiers, cluster_images, cluster_labels, cluster_identity, nFold=6)
+            final_score = final_score + score*pred.size
+            pred_counter = pred_counter + pred.size
+            end = time.time()
+            elapsed = end - start
+            print "Time taken: ", elapsed, "seconds."
+        print "Overall rate:", final_score/pred_counter
+    else:
+        #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
+        #write_to_file(pred_voted)
+        start = time.time()
+        validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=6) 
+        end = time.time()
+        elapsed = end - start
+        print "Time taken: ", elapsed, "seconds."
 
 """
 if __name__ == '__main__':

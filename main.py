@@ -8,6 +8,7 @@ Created on Wed Nov 19 16:12:02 2014
 """
 
 import scipy.io
+from scipy import stats
 from scipy.misc import *
 import numpy as np
 import matplotlib.pyplot as plt
@@ -120,33 +121,28 @@ def transform_(tr_images, x, y):
 
     r = np.array([ imresize(tr_images[:,:,i], (x_width,y_width))[x_a:x_b,y_a:y_b] for i in xrange(tr_images.shape[2]) ])
     return np.rollaxis(r, 0, 3)
-    #return np.array([ np.asarray(Image.fromarray(tr_images[:,:,i]).resize((x_width,y_width)))[:,:] for i in xrange(tr_images.shape[2]) ])
 
-def evaluate_multiple(classifiers, tr_images, tr_labels):
-    prediction_ensemble = []
-    train_vs_valid_proportion = 0.85
-    n_train = train_vs_valid_proportion * len(tr_images)
-    for c in classifiers:
-        trained = skLearnStuff.train_classifier(tr_images[:n_train], tr_labels[:n_train].ravel(), c, verbose=True)
-        score, pred = skLearnStuff.evaluate(tr_images[n_train:], tr_labels[n_train:].ravel(), trained_classifier=trained, verbose=True)
-        prediction_ensemble.append(pred)
+def validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5):
+    ''' Do n-fold validation with multiple classifiers; based on popularity vote '''
 
-    prediction_ensemble = np.array(prediction_ensemble)
-    pred_voted = np.zeros(prediction_ensemble.shape[1])
-    for i in range(prediction_ensemble.shape[1]):
-        d = {}
-        for k in prediction_ensemble[:,i]:
-            t = d.get(k, 0)
-            d[k] = t + 1
-        pred_voted[i] = max(d.keys(), key=lambda x: d[x])
+    j = 1
+    valid_score = 0.0
+    for nfold_tr_images, nfold_tr_labels, nfold_val_images, nfold_val_labels in cross_validations(tr_images, tr_labels, tr_identity, nFold=nFold):
+        prediction_ensemble = []
+        for c in classifiers:
+            trained = c.fit(nfold_tr_images, nfold_tr_labels.ravel())
+            pred = trained.predict(nfold_val_images).ravel()
+            prediction_ensemble.append(pred)
 
-    print pred_voted
-    valid_labels = tr_labels[n_train:]
+        prediction_ensemble = np.array(prediction_ensemble)
+        pred_voted = stats.mode(prediction_ensemble, axis=0)[0]
+        valid_score_ = np.sum(pred_voted.ravel() == nfold_val_labels.ravel()) / float(nfold_val_labels.size)
+        valid_score += valid_score_ / nFold
+        print "validate_multiple: completed {}/{} folds (fold score: {})".format(j, nFold, valid_score_)
+        j += 1
 
-    false_count = np.flatnonzero(valid_labels.reshape(-1) - pred_voted.reshape(-1)).size
-    rate = float(valid_labels.size - false_count)/valid_labels.size
-    print "Ensemble classification rate:", rate
-    return rate, pred_voted
+    print "Ensemble classification rate:", valid_score
+    return valid_score, pred_voted
 
 def generate_test_labels(classifiers, tr_images, tr_labels, test_images):
     pred_ensemble_test = []
@@ -187,7 +183,7 @@ def fetch_classifier():
         joblib.dump(c, 'classifier.pkl')
     return c
 
-def cross_validations(images, labels, identity, nFold=10):
+def cross_validations(images, labels, identity, nFold=5):
 
     #create dictionary of {identities: indicies of corresponding labels}
     d = {}
@@ -263,31 +259,20 @@ if __name__ == '__main__':
 
     classifiers = [
         #neighbors.KNeighborsClassifier(n_neighbors=8, p=2),
-        #svm.SVC(),
+        svm.SVC(),
         knn_bagging,
         #linear_model.RidgeClassifierCV(),
         #neighbors.NearestNeighbors(n_neighbors=2, algorithm='ball_tree'),
         #naive_bayes.GaussianNB(),
         #tree.DecisionTreeClassifier(criterion="entropy"),
-        #trees_bagging,
-        #RandomForestClassifier(n_estimators=60),
+        trees_bagging,
+        RandomForestClassifier(n_estimators=60),
     ]
 
     #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
     #write_to_file(pred_voted)
 
-    NFOLD = 5
-    valid_score = 0.0
-    j = 1
-    for nfold_tr_images, nfold_tr_labels, nfold_val_images, nfold_val_labels in cross_validations(tr_images, tr_labels, tr_identity, nFold=NFOLD):
-        trained = classifiers[0].fit(nfold_tr_images, nfold_tr_labels.ravel())
-        valid_score_ = trained.score(nfold_val_images, nfold_val_labels)
-        valid_score += valid_score_ / NFOLD
-        print "K-fold validation: completed {}/{} folds (fold score: {})".format(j, NFOLD, valid_score_)
-        j += 1
-
-    print(valid_score)
-    #rate, pred_voted = evaluate_multiple(classifiers, tr_images, tr_labels)
+    validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5)
 
 """
 if __name__ == '__main__':

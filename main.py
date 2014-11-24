@@ -60,7 +60,7 @@ def init_data():
         things_to_join = (tr_identity, tr_identity, tr_identity, tr_identity, tr_identity)
         tr_identity = np.concatenate(things_to_join)
 
-    ADD_TRANSFORMED_DATA_2 = False
+    ADD_TRANSFORMED_DATA_2 = True
     if ADD_TRANSFORMED_DATA_2:
         tr_images_0_1 = transform_(tr_images, 0, 1)
         tr_images_0_m1 = transform_(tr_images, 0, -1)
@@ -89,7 +89,7 @@ def init_data():
     test_images = preprocessing.scale(test_images,1)
 
     # PCA reduction/projection
-    if True:
+    if False:
         dim = 50
         pca = PCA(n_components=dim)
         tr_images = pca.fit_transform(tr_images)
@@ -289,9 +289,9 @@ if __name__ == '__main__':
 
     classifiers = [
         #neighbors.KNeighborsClassifier(n_neighbors=7, p=2),
-        #svm.SVC(),
+        svm.SVC(),
         #knn_bagging,
-        linear_model.LogisticRegression(C=.01),
+        #linear_model.LogisticRegression(C=.01),
         #linear_model.RidgeClassifierCV(),
         #ridgeCV_ada,
         #naive_bayes.GaussianNB(),
@@ -303,7 +303,7 @@ if __name__ == '__main__':
         #adaboost,
     ]
 
-    if False:
+    if True:
         nCluster = 15
         #kmean = cluster.KMeans(n_clusters=nCluster, n_jobs=8)
         kmean = cluster.MiniBatchKMeans(n_clusters=nCluster, batch_size=30, n_init=12)
@@ -311,21 +311,40 @@ if __name__ == '__main__':
         test_clusters = kmean.predict(test_images)
 
         clusters = []
-        final_score = 0;
-        pred_counter = 0;
+        scores = []
+        final_score = 0
+        pred_counter = 0
         for i in range(nCluster):
+                 
+            #Clustering
             cluster_index = train_clusters==i
             cluster_images = tr_images[cluster_index]
             cluster_labels = tr_labels[cluster_index]
             cluster_identity = tr_identity[cluster_index]
+            #PCA
+            if True:
+                dim = 50
+                pca = PCA(n_components=dim)
+                tr_images = pca.fit_transform(tr_images)
+
+                pca_ = PCA(n_components=dim)
+                test_images = pca.fit_transform(test_images)
+                print "PCA Total explained variance:", np.sum(pca.explained_variance_ratio_) 
             start = time.time()
+
             score, pred = validate_multiple(classifiers, cluster_images, cluster_labels, cluster_identity, nFold=6)
-            final_score = final_score + score*pred.size
+            scores.append(score)
             pred_counter = pred_counter + pred.size
             end = time.time()
             elapsed = end - start
             print "Time taken: ", elapsed, "seconds."
-        print "Overall rate:", final_score/pred_counter
+            print "cluster size:", cluster_labels.size 
+            
+        #calculate standard dev
+        scores= np.array(scores)
+
+        print "Overall rate:", final_score/float(pred_counter)
+        print "range:", np.max(scores) - np.min(scores)
     else:
         #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
         #write_to_file(pred_voted)

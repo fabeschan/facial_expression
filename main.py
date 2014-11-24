@@ -18,8 +18,12 @@ from sklearn.ensemble import BaggingClassifier, RandomForestClassifier, AdaBoost
 from sklearn.multiclass import OutputCodeClassifier, OneVsRestClassifier
 from sklearn import preprocessing, cluster
 from sklearn.decomposition import PCA
+from skimage import filter, color, io, exposure
+from scipy.ndimage import gaussian_filter, laplace
+from scipy.ndimage import filters
 import run_knn, skLearnStuff
 import time
+import sys
 
 def init_data():
 
@@ -81,6 +85,44 @@ def init_data():
         things_to_join = (tr_identity, tr_identity, tr_identity, tr_identity, tr_identity, tr_identity, tr_identity, tr_identity, tr_identity)
         tr_identity = np.concatenate(things_to_join)
 
+    # More processing
+    if False:
+        SHOW_FILTER = False
+        if SHOW_FILTER:
+            plt.figure(1)
+            plt.clf()
+            plt.imshow(tr_images[:,:,0], cmap=plt.cm.gray)
+            plt.show()
+        #tr_images = np.array([exposure.equalize_hist(tr_images[:,:,i]) for i in xrange(tr_images.shape[2])])
+        #test_images = np.array([exposure.equalize_hist(test_images[:,:,i]) for i in xrange(test_images.shape[2])])
+        #tr_images = np.array([gaussian_filter(tr_images[:,:,i], sigma=0.5) for i in xrange(tr_images.shape[2])])
+        #test_images = np.array([gaussian_filter(test_images[:,:,i], sigma=0.5) for i in xrange(test_images.shape[2])])
+        tr_images = np.array([filters.gaussian_laplace(tr_images[:,:,i], sigma=0.4) for i in xrange(tr_images.shape[2])])
+        test_images = np.array([filters.gaussian_laplace(test_images[:,:,i], sigma=0.4) for i in xrange(test_images.shape[2])])
+
+        #tr_images = np.array([filter.edges.prewitt(tr_images[:,:,i]) for i in xrange(tr_images.shape[2])])
+        #test_images = np.array([filter.edges.prewitt(test_images[:,:,i]) for i in xrange(test_images.shape[2])])
+        #tr_images = np.array([filter.edges.sobel(tr_images[:,:,i]) for i in xrange(tr_images.shape[2])])
+        #test_images = np.array([filter.edges.sobel(test_images[:,:,i]) for i in xrange(test_images.shape[2])])
+        tr_images = np.rollaxis(tr_images, 0, 3)
+        test_images = np.rollaxis(test_images, 0, 3)
+        if SHOW_FILTER:
+            plt.figure(2)
+            plt.clf()
+            plt.imshow(tr_images[:,:,0], cmap=plt.cm.gray)
+            plt.show()
+            sys.exit()
+
+    if True:
+        ID = 1011
+        tr_ID = tr_images[:,:,tr_identity.ravel()==ID]
+        for i in range(tr_ID.shape[2]):
+            plt.figure(i + 3)
+            plt.clf()
+            plt.imshow(tr_ID[:,:,i], cmap=plt.cm.gray)
+            plt.show()
+        sys.exit()
+
     # Preprocess the training set
     tr_images = np.array([tr_images[:,:,i].reshape(-1) for i in xrange(tr_images.shape[2])])
     tr_images = preprocessing.scale(tr_images,1)
@@ -141,20 +183,26 @@ def validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5, v
 
     j = 1
     valid_score = 0.0
-    for nfold_tr_images, nfold_tr_labels, nfold_val_images, nfold_val_labels in cross_validations(tr_images, tr_labels, tr_identity, nFold=nFold):
+    for nfold_tr_images, nfold_tr_labels, nfold_val_images, nfold_val_labels, nfold_val_identity in cross_validations(tr_images, tr_labels, tr_identity, nFold=nFold):
         prediction_ensemble = []
         for c in classifiers:
 
-            trained = c.fit(nfold_tr_images, nfold_tr_labels.ravel())
+            trained = c.fit(nfold_tr_images, nfold_tr_labels)
             pred = trained.predict(nfold_val_images).ravel()
             prediction_ensemble.append(pred)
 
         prediction_ensemble = np.array(prediction_ensemble)
-        pred_voted = stats.mode(prediction_ensemble, axis=0)[0]
-        valid_score_ = np.sum(pred_voted.ravel() == nfold_val_labels.ravel()) / float(nfold_val_labels.size)
+        pred_voted = stats.mode(prediction_ensemble, axis=0)[0].ravel()
+        valid_score_ = np.sum(pred_voted == nfold_val_labels) / float(nfold_val_labels.size)
         valid_score += valid_score_ * (1 - float(nfold_tr_labels.size) / tr_labels.size)
         if verbose:
             print "validate_multiple: completed {}/{} folds (fold score: {})".format(j, nFold, valid_score_)
+            print "\tValid fold size: {}".format(nfold_val_labels.size)
+            for vid in set(nfold_val_identity.tolist()):
+                v_rate = np.sum(pred_voted[nfold_val_identity==vid] == nfold_val_labels[nfold_val_identity==vid])
+                print "\tRate for identity({}): {}/{}".format(vid, v_rate, np.sum(nfold_val_identity==vid))
+
+
         j += 1
 
     print "Ensemble classification rate:", valid_score
@@ -208,8 +256,17 @@ def cross_validations(images, labels, identity, nFold=5):
         d[identity[i][0]] = t
         t.append(i)
 
+    #unidentified = d[-1]
+    #del d[-1]
+
+    #for i in range(len(unidentified)):
+    #    index = d.keys()[i % len(d.keys())]
+    #    d[index].append(unidentified[i])
+
     #create folds
     folds = cross_validation.KFold(len(d.keys()), nFold, shuffle=True)
+    d_values = d.values()
+    d_keys = d.keys()
 
     #convert fold randomization into usable indicies
     for train_index, test_index in folds:
@@ -218,23 +275,26 @@ def cross_validations(images, labels, identity, nFold=5):
         tr_labels = []
         val_images = []
         val_labels = []
+        val_identity = []
 
-        imageIndex = [d.values()[i] for i in train_index.tolist()]
+        imageIndex = [d_values[i] for i in train_index.tolist()]
         for index in imageIndex:
             tr_images = tr_images + [images[i] for i in index]
             tr_labels = tr_labels + [labels[i] for i in index]
 
-        imageIndex = [d.values()[i] for i in test_index.tolist()]
+        imageIndex = [d_values[i] for i in test_index.tolist()]
         for index in imageIndex:
             val_images = val_images + [images[i] for i in index]
             val_labels = val_labels + [labels[i] for i in index]
+            val_identity = val_identity + [identity[i] for i in index]
 
         tr_images = np.array(tr_images)
-        tr_labels = np.array(tr_labels)
+        tr_labels = np.array(tr_labels).ravel()
         val_images = np.array(val_images)
-        val_labels = np.array(val_labels)
+        val_labels = np.array(val_labels).ravel()
+        val_identity = np.array(val_identity).ravel()
 
-        yield tr_images, tr_labels, val_images, val_labels
+        yield tr_images, tr_labels, val_images, val_labels, val_identity
 
 def write_to_file(predictions):
     with open("csv.csv", 'w') as f:
@@ -306,9 +366,9 @@ if __name__ == '__main__':
         #OneVsRestClassifier(svm.LinearSVC(random_state=0)),
         #OutputCodeClassifier(svm.LinearSVC(random_state=0), code_size=2, random_state=0),
         #knn_bagging,
-        #linear_model.LogisticRegression(C=.01),
+        linear_model.LogisticRegression(C=.01),
         #linear_model.RidgeClassifierCV(),
-        gnb_ada,
+        #gnb_ada,
         #naive_bayes.GaussianNB(),
         #tree.DecisionTreeClassifier(criterion="entropy"),
         #trees_bagging,

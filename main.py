@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from sklearn import cross_validation
 from sklearn import datasets, neighbors, linear_model, svm, naive_bayes, tree
 from sklearn.ensemble import BaggingClassifier, RandomForestClassifier, AdaBoostClassifier
+from sklearn.multiclass import OutputCodeClassifier, OneVsRestClassifier
 from sklearn import preprocessing, cluster
 from sklearn.decomposition import PCA
 import run_knn, skLearnStuff
@@ -60,7 +61,7 @@ def init_data():
         things_to_join = (tr_identity, tr_identity, tr_identity, tr_identity, tr_identity)
         tr_identity = np.concatenate(things_to_join)
 
-    ADD_TRANSFORMED_DATA_2 = True
+    ADD_TRANSFORMED_DATA_2 = False
     if ADD_TRANSFORMED_DATA_2:
         tr_images_0_1 = transform_(tr_images, 0, 1)
         tr_images_0_m1 = transform_(tr_images, 0, -1)
@@ -90,7 +91,7 @@ def init_data():
 
     # PCA reduction/projection
     if False:
-        dim = 50
+        dim = 250
         pca = PCA(n_components=dim)
         tr_images = pca.fit_transform(tr_images)
 
@@ -135,7 +136,7 @@ def transform_(tr_images, x, y):
     r = np.array([ imresize(tr_images[:,:,i], (x_width,y_width))[x_a:x_b,y_a:y_b] for i in xrange(tr_images.shape[2]) ])
     return np.rollaxis(r, 0, 3)
 
-def validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5):
+def validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5, verbose=True):
     ''' Do n-fold validation with multiple classifiers; based on popularity vote '''
 
     j = 1
@@ -152,7 +153,8 @@ def validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5):
         pred_voted = stats.mode(prediction_ensemble, axis=0)[0]
         valid_score_ = np.sum(pred_voted.ravel() == nfold_val_labels.ravel()) / float(nfold_val_labels.size)
         valid_score += valid_score_ * (1 - float(nfold_tr_labels.size) / tr_labels.size)
-        print "validate_multiple: completed {}/{} folds (fold score: {})".format(j, nFold, valid_score_)
+        if verbose:
+            print "validate_multiple: completed {}/{} folds (fold score: {})".format(j, nFold, valid_score_)
         j += 1
 
     print "Ensemble classification rate:", valid_score
@@ -249,7 +251,7 @@ if __name__ == '__main__':
     tr_images, tr_labels, tr_identity, test_images = init_data()
 
     #labels = run_knn.run_knn(5, train_img, train_labels, train_img)
- 
+
 
     knn_bagging = BaggingClassifier(
         neighbors.KNeighborsClassifier(n_neighbors=5, p=2),
@@ -258,6 +260,14 @@ if __name__ == '__main__':
         max_features=0.4,
         bootstrap_features=True,
         n_jobs=8,
+        )
+
+    svm_bagging = BaggingClassifier(
+        svm.LinearSVC(),
+        n_estimators=40,
+        n_jobs=8,
+        max_samples=0.4,
+        max_features=0.4,
         )
 
     trees_bagging = BaggingClassifier(
@@ -280,20 +290,25 @@ if __name__ == '__main__':
         algorithm="SAMME.R",
         )
 
-    ridgeCV_ada = AdaBoostClassifier(
-        linear_model.RidgeClassifierCV(),
-        n_estimators=200,
-        learning_rate=1,
-        algorithm="SAMME",
+    gnb_ada = BaggingClassifier(
+        linear_model.LogisticRegression(C=.01),
+        n_estimators=30,
+        n_jobs=8,
+        max_samples=0.5,
+        max_features=0.5,
         )
 
     classifiers = [
         #neighbors.KNeighborsClassifier(n_neighbors=7, p=2),
-        svm.SVC(),
+        #svm.SVC(),
+        #svm.LinearSVC(),
+        #svm_bagging,
+        #OneVsRestClassifier(svm.LinearSVC(random_state=0)),
+        #OutputCodeClassifier(svm.LinearSVC(random_state=0), code_size=2, random_state=0),
         #knn_bagging,
         #linear_model.LogisticRegression(C=.01),
         #linear_model.RidgeClassifierCV(),
-        #ridgeCV_ada,
+        gnb_ada,
         #naive_bayes.GaussianNB(),
         #tree.DecisionTreeClassifier(criterion="entropy"),
         #trees_bagging,
@@ -303,7 +318,7 @@ if __name__ == '__main__':
         #adaboost,
     ]
 
-    if True:
+    if False:
         nCluster = 15
         #kmean = cluster.KMeans(n_clusters=nCluster, n_jobs=8)
         kmean = cluster.MiniBatchKMeans(n_clusters=nCluster, batch_size=30, n_init=12)
@@ -315,7 +330,7 @@ if __name__ == '__main__':
         final_score = 0
         pred_counter = 0
         for i in range(nCluster):
-                 
+
             #Clustering
             cluster_index = train_clusters==i
             cluster_images = tr_images[cluster_index]
@@ -329,17 +344,16 @@ if __name__ == '__main__':
 
                 pca_ = PCA(n_components=dim)
                 test_images = pca.fit_transform(test_images)
-                print "PCA Total explained variance:", np.sum(pca.explained_variance_ratio_) 
+                print "PCA Total explained variance:", np.sum(pca.explained_variance_ratio_)
             start = time.time()
-
-            score, pred = validate_multiple(classifiers, cluster_images, cluster_labels, cluster_identity, nFold=6)
+            score, pred = validate_multiple(classifiers, cluster_images, cluster_labels, cluster_identity, nFold=6, verbose=False)
             scores.append(score)
             pred_counter = pred_counter + pred.size
             end = time.time()
             elapsed = end - start
             print "Time taken: ", elapsed, "seconds."
-            print "cluster size:", cluster_labels.size 
-            
+            print "cluster size:", cluster_labels.size
+
         #calculate standard dev
         scores= np.array(scores)
 
@@ -349,32 +363,8 @@ if __name__ == '__main__':
         #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
         #write_to_file(pred_voted)
         start = time.time()
-        validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=6) 
+        validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=6)
         end = time.time()
         elapsed = end - start
         print "Time taken: ", elapsed, "seconds."
 
-"""
-if __name__ == '__main__':
-    tr_images, tr_labels, tr_identity, test_images = init_data()
-    #labels = run_knn.run_knn(5, train_img, train_labels, train_img)
-
-    classifiers = [
-        neighbors.KNeighborsClassifier(),
-        #linear_model.RidgeClassifierCV(),
-        #neighbors.NearestNeighbors(n_neighbors=2, algorithm='ball_tree'),
-        #naive_bayes.GaussianNB(),
-        #tree.DecisionTreeClassifier(criterion="entropy"),
-    ]
-
-    #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
-    #write_to_file(pred_voted)
-    K=[3,4,5,6,7,8,9,10,15,20,35,50]
-    for k in K:
-        classifier = neighbors.KNeighborsClassifier(p=2, n_neighbors=k)
-        valid_score = cross_validations(classifier, tr_images, tr_labels, tr_identity, nFold=5)
-        print "valid_score: "+str(valid_score) +"k: " + str(k)
-
-
-    #rate, pred_voted = evaluate_multiple(classifiers, tr_images, tr_labels)
-"""

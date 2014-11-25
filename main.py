@@ -19,6 +19,7 @@ from sklearn.multiclass import OutputCodeClassifier, OneVsRestClassifier
 from sklearn import preprocessing, cluster
 from sklearn.decomposition import PCA
 from skimage import filter, color, io, exposure
+from skimage.feature import local_binary_pattern
 from scipy.ndimage import gaussian_filter, laplace
 from scipy.ndimage import filters
 import run_knn, skLearnStuff
@@ -97,15 +98,26 @@ def init_data():
         #test_images = np.array([exposure.equalize_hist(test_images[:,:,i]) for i in xrange(test_images.shape[2])])
         #tr_images = np.array([gaussian_filter(tr_images[:,:,i], sigma=0.5) for i in xrange(tr_images.shape[2])])
         #test_images = np.array([gaussian_filter(test_images[:,:,i], sigma=0.5) for i in xrange(test_images.shape[2])])
-        tr_images = np.array([filters.gaussian_laplace(tr_images[:,:,i], sigma=0.4) for i in xrange(tr_images.shape[2])])
-        test_images = np.array([filters.gaussian_laplace(test_images[:,:,i], sigma=0.4) for i in xrange(test_images.shape[2])])
+        #tr_images = np.array([filters.gaussian_laplace(tr_images[:,:,i], sigma=0.3) for i in xrange(tr_images.shape[2])])
+        #test_images = np.array([filters.gaussian_laplace(test_images[:,:,i], sigma=0.3) for i in xrange(test_images.shape[2])])
 
         #tr_images = np.array([filter.edges.prewitt(tr_images[:,:,i]) for i in xrange(tr_images.shape[2])])
         #test_images = np.array([filter.edges.prewitt(test_images[:,:,i]) for i in xrange(test_images.shape[2])])
         #tr_images = np.array([filter.edges.sobel(tr_images[:,:,i]) for i in xrange(tr_images.shape[2])])
         #test_images = np.array([filter.edges.sobel(test_images[:,:,i]) for i in xrange(test_images.shape[2])])
+        #tr_images = np.rollaxis(tr_images, 0, 3)
+        #test_images = np.rollaxis(test_images, 0, 3)
+
+        # GENERAL LBP
+        radius = 3
+        n_points = 24
+        METHOD = 'uniform'
+        tr_images = np.array([local_binary_pattern(tr_images[:,:,i], n_points, radius, METHOD) for i in xrange(tr_images.shape[2])])
+        test_images = np.array([local_binary_pattern(test_images[:,:,i], n_points, radius, METHOD) for i in xrange(test_images.shape[2])])
+        print tr_images.shape
         tr_images = np.rollaxis(tr_images, 0, 3)
         test_images = np.rollaxis(test_images, 0, 3)
+
         if SHOW_FILTER:
             plt.figure(2)
             plt.clf()
@@ -113,7 +125,7 @@ def init_data():
             plt.show()
             sys.exit()
 
-    if True:
+    if False:
         ID = 1011
         tr_ID = tr_images[:,:,tr_identity.ravel()==ID]
         for i in range(tr_ID.shape[2]):
@@ -123,13 +135,58 @@ def init_data():
             plt.show()
         sys.exit()
 
+    if False: # localized LBP
+        radius = 2
+        n_points = 16
+        METHOD = 'uniform'
+        b, c = 11, 21
+        y, z = 11, 22
+        tr_im_lbp = np.zeros(tr_images.shape)
+        test_im_lbp = np.zeros(test_images.shape)
+        for i in xrange(tr_images.shape[2]):
+            tr_im_lbp[:b,:y,i] = local_binary_pattern(tr_images[:b,:y,i], n_points, radius, METHOD)
+            tr_im_lbp[:b,y:z,i] = local_binary_pattern(tr_images[:b,y:z,i], n_points, radius, METHOD)
+            tr_im_lbp[:b,z:,i] = local_binary_pattern(tr_images[:b,z:,i], n_points, radius, METHOD)
+            tr_im_lbp[b:c,:y,i] = local_binary_pattern(tr_images[b:c,:y,i], n_points, radius, METHOD)
+            tr_im_lbp[b:c,y:z,i] = local_binary_pattern(tr_images[b:c,y:z,i], n_points, radius, METHOD)
+            tr_im_lbp[b:c,z:,i] = local_binary_pattern(tr_images[b:c,z:,i], n_points, radius, METHOD)
+            tr_im_lbp[c:,:y,i] = local_binary_pattern(tr_images[c:,:y,i], n_points, radius, METHOD)
+            tr_im_lbp[c:,y:z,i] = local_binary_pattern(tr_images[c:,y:z,i], n_points, radius, METHOD)
+            tr_im_lbp[c:,z:,i] = local_binary_pattern(tr_images[c:,z:,i], n_points, radius, METHOD)
+
+        for i in xrange(test_images.shape[2]):
+            test_im_lbp[:b,:y,i] = local_binary_pattern(test_images[:b,:y,i], n_points, radius, METHOD)
+            test_im_lbp[:b,y:z,i] = local_binary_pattern(test_images[:b,y:z,i], n_points, radius, METHOD)
+            test_im_lbp[:b,z:,i] = local_binary_pattern(test_images[:b,z:,i], n_points, radius, METHOD)
+            test_im_lbp[b:c,:y,i] = local_binary_pattern(test_images[b:c,:y,i], n_points, radius, METHOD)
+            test_im_lbp[b:c,y:z,i] = local_binary_pattern(test_images[b:c,y:z,i], n_points, radius, METHOD)
+            test_im_lbp[b:c,z:,i] = local_binary_pattern(test_images[b:c,z:,i], n_points, radius, METHOD)
+            test_im_lbp[c:,:y,i] = local_binary_pattern(test_images[c:,:y,i], n_points, radius, METHOD)
+            test_im_lbp[c:,y:z,i] = local_binary_pattern(test_images[c:,y:z,i], n_points, radius, METHOD)
+            test_im_lbp[c:,z:,i] = local_binary_pattern(test_images[c:,z:,i], n_points, radius, METHOD)
+
+        #tr_images = tr_im_lbp
+        #test_images = test_im_lbp
+        #print tr_images.shape
+
     # Preprocess the training set
+    #tr_images = np.array([np.hstack([tr_images[:,:,i].reshape(-1),tr_im_lbp[:,:,i].reshape(-1)]) for i in xrange(tr_images.shape[2])])
+    #tr_images = np.array([tr_im_lbp[:,:,i].reshape(-1) for i in xrange(tr_images.shape[2])])
+
     tr_images = np.array([tr_images[:,:,i].reshape(-1) for i in xrange(tr_images.shape[2])])
-    tr_images = preprocessing.scale(tr_images,1)
+    #tr_images = preprocessing.scale(tr_images,1)
 
     # Preprocess the test set
+    #test_images = np.array([np.hstack([test_images[:,:,i].reshape(-1),test_im_lbp[:,:,i].reshape(-1)]) for i in xrange(test_images.shape[2])])
+    #test_images = np.array([test_im_lbp[:,:,i].reshape(-1) for i in xrange(test_images.shape[2])])
+
     test_images = np.array([test_images[:,:,i].reshape(-1) for i in xrange(test_images.shape[2])])
-    test_images = preprocessing.scale(test_images,1)
+    tr_test_images = np.vstack([test_images, tr_images])
+    print tr_test_images.shape
+    #test_images = preprocessing.scale(test_images,1)
+    preproc = preprocessing.scale(tr_test_images,1)
+    test_images, tr_images = preproc[:test_images.shape[0],:], preproc[test_images.shape[0]:,:]
+    print test_images.shape, tr_images.shape
 
     # PCA reduction/projection
     if False:
@@ -192,15 +249,17 @@ def validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5, v
             prediction_ensemble.append(pred)
 
         prediction_ensemble = np.array(prediction_ensemble)
-        pred_voted = stats.mode(prediction_ensemble, axis=0)[0].ravel()
+        pred_voted = stats.mode(prediction_ensemble, axis=0)[0].ravel().astype(int)
         valid_score_ = np.sum(pred_voted == nfold_val_labels) / float(nfold_val_labels.size)
         valid_score += valid_score_ * (1 - float(nfold_tr_labels.size) / tr_labels.size)
         if verbose:
             print "validate_multiple: completed {}/{} folds (fold score: {})".format(j, nFold, valid_score_)
             print "\tValid fold size: {}".format(nfold_val_labels.size)
+            """
             for vid in set(nfold_val_identity.tolist()):
                 v_rate = np.sum(pred_voted[nfold_val_identity==vid] == nfold_val_labels[nfold_val_identity==vid])
                 print "\tRate for identity({}): {}/{}".format(vid, v_rate, np.sum(nfold_val_identity==vid))
+            """
 
 
         j += 1
@@ -359,14 +418,14 @@ if __name__ == '__main__':
         )
 
     classifiers = [
-        #neighbors.KNeighborsClassifier(n_neighbors=7, p=2),
-        #svm.SVC(),
+        #neighbors.KNeighborsClassifier(n_neighbors=5, p=2),
+        svm.SVC(),
         #svm.LinearSVC(),
         #svm_bagging,
         #OneVsRestClassifier(svm.LinearSVC(random_state=0)),
         #OutputCodeClassifier(svm.LinearSVC(random_state=0), code_size=2, random_state=0),
         #knn_bagging,
-        linear_model.LogisticRegression(C=.01),
+        #linear_model.LogisticRegression(C=.01),
         #linear_model.RidgeClassifierCV(),
         #gnb_ada,
         #naive_bayes.GaussianNB(),

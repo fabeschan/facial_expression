@@ -32,11 +32,16 @@ def init_data():
     tr_images = imagesDic["tr_images"].astype(float)
     tr_identity = imagesDic["tr_identity"].astype(float)
     tr_labels = imagesDic["tr_labels"]
+    tr_images_O = tr_images
+    tr_identity_O = tr_identity
+    tr_labels_O = tr_labels
+
 
     # Test Data
     imagesDic = scipy.io.loadmat(file_name="public_test_images.mat")
     test_images = imagesDic["public_test_images"].astype(float)
-
+    test_images_O = test_images
+    
     SHOW_TRANSFORM_COMPARISON = False
     if SHOW_TRANSFORM_COMPARISON:
         trtr = transform_(tr_images, 0, 4)
@@ -113,7 +118,7 @@ def init_data():
             plt.show()
             sys.exit()
 
-    if True:
+    if False:
         ID = 1011
         tr_ID = tr_images[:,:,tr_identity.ravel()==ID]
         for i in range(tr_ID.shape[2]):
@@ -126,10 +131,16 @@ def init_data():
     # Preprocess the training set
     tr_images = np.array([tr_images[:,:,i].reshape(-1) for i in xrange(tr_images.shape[2])])
     tr_images = preprocessing.scale(tr_images,1)
+    
+    tr_images_O = np.array([tr_images_O[:,:,i].reshape(-1) for i in xrange(tr_images_O.shape[2])])
+    tr_images_O = preprocessing.scale(tr_images_O,1)
 
     # Preprocess the test set
     test_images = np.array([test_images[:,:,i].reshape(-1) for i in xrange(test_images.shape[2])])
     test_images = preprocessing.scale(test_images,1)
+    
+    test_images_O = np.array([test_images_O[:,:,i].reshape(-1) for i in xrange(test_images_O.shape[2])])
+    test_images_O = preprocessing.scale(test_images_O,1)
 
     # PCA reduction/projection
     if False:
@@ -141,7 +152,7 @@ def init_data():
         test_images = pca.fit_transform(test_images)
         print "PCA Total explained variance:", np.sum(pca.explained_variance_ratio_)
 
-    return tr_images, tr_labels, tr_identity, test_images
+    return tr_images, tr_labels, tr_identity, test_images, tr_images_O, tr_labels_O, tr_identity_O, test_images_O
 
 """
 nTrainExample = 2162
@@ -178,11 +189,20 @@ def transform_(tr_images, x, y):
     r = np.array([ imresize(tr_images[:,:,i], (x_width,y_width))[x_a:x_b,y_a:y_b] for i in xrange(tr_images.shape[2]) ])
     return np.rollaxis(r, 0, 3)
 
-def validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5, verbose=True):
+def validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5, verbose=True, aux_classify1=False, aux_classify2=False):
     ''' Do n-fold validation with multiple classifiers; based on popularity vote '''
 
     j = 1
     valid_score = 0.0
+    Histogram1 = {}
+    Histogram2 = {}
+    
+    trained_6 = aux_classify1
+    trained_7 = aux_classify2
+    
+    #score, pred = validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=6)
+    
+    
     for nfold_tr_images, nfold_tr_labels, nfold_val_images, nfold_val_labels, nfold_val_identity in cross_validations(tr_images, tr_labels, tr_identity, nFold=nFold):
         prediction_ensemble = []
         for c in classifiers:
@@ -192,19 +212,45 @@ def validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5, v
             prediction_ensemble.append(pred)
 
         prediction_ensemble = np.array(prediction_ensemble)
-        pred_voted = stats.mode(prediction_ensemble, axis=0)[0].ravel()
+        pred_voted = stats.mode(prediction_ensemble, axis=0)[0].ravel().astype(int)
+
+        #create histogram 
+        labelPairs = zip(pred_voted.tolist(), nfold_val_labels.tolist())
+
+        for val in labelPairs:
+            Histogram1[val] = Histogram1.get(val,0) + 1
+            
+        #use auxilary classifier to classify tricky cases
+        #if aux_classify1 and aux_classify2:
+        if False:
+            pred_6_index = np.nonzero(pred_voted == 6)
+            re_eval = trained_6.predict(nfold_val_images[pred_6_index])
+            for i in range(len(pred_6_index)):
+                pred_voted[pred_6_index[i]] = re_eval[i]
+            
+            pred_7_index = np.nonzero(pred_voted == 7)
+            re_eval = trained_7.predict(nfold_val_images[pred_7_index])
+            for i in range(len(pred_7_index)):
+                pred_voted[pred_7_index[i]] = re_eval[i]         
+            
+            #create histogram for corrected labels
+            labelPairs = zip(pred_voted.tolist(), nfold_val_labels.tolist())
+    
+            for val in labelPairs:
+                Histogram2[val] = Histogram2.get(val,0) + 1
+            
         valid_score_ = np.sum(pred_voted == nfold_val_labels) / float(nfold_val_labels.size)
         valid_score += valid_score_ * (1 - float(nfold_tr_labels.size) / tr_labels.size)
         if verbose:
             print "validate_multiple: completed {}/{} folds (fold score: {})".format(j, nFold, valid_score_)
             print "\tValid fold size: {}".format(nfold_val_labels.size)
+            """            
             for vid in set(nfold_val_identity.tolist()):
                 v_rate = np.sum(pred_voted[nfold_val_identity==vid] == nfold_val_labels[nfold_val_identity==vid])
                 print "\tRate for identity({}): {}/{}".format(vid, v_rate, np.sum(nfold_val_identity==vid))
-
-
+            """
         j += 1
-
+    
     print "Ensemble classification rate:", valid_score
     return valid_score, pred_voted
 
@@ -266,7 +312,6 @@ def cross_validations(images, labels, identity, nFold=5):
     #create folds
     folds = cross_validation.KFold(len(d.keys()), nFold, shuffle=True)
     d_values = d.values()
-    d_keys = d.keys()
 
     #convert fold randomization into usable indicies
     for train_index, test_index in folds:
@@ -308,7 +353,7 @@ def write_to_file(predictions):
                 f.write(s)
 
 if __name__ == '__main__':
-    tr_images, tr_labels, tr_identity, test_images = init_data()
+    tr_images, tr_labels, tr_identity, test_images, tr_images_O, tr_labels_O, tr_identity_O, test_images_O = init_data()
 
     #labels = run_knn.run_knn(5, train_img, train_labels, train_img)
 
@@ -360,13 +405,13 @@ if __name__ == '__main__':
 
     classifiers = [
         #neighbors.KNeighborsClassifier(n_neighbors=7, p=2),
-        #svm.SVC(),
+        svm.SVC(),
         #svm.LinearSVC(),
         #svm_bagging,
         #OneVsRestClassifier(svm.LinearSVC(random_state=0)),
         #OutputCodeClassifier(svm.LinearSVC(random_state=0), code_size=2, random_state=0),
         #knn_bagging,
-        linear_model.LogisticRegression(C=.01),
+        #linear_model.LogisticRegression(C=.01),
         #linear_model.RidgeClassifierCV(),
         #gnb_ada,
         #naive_bayes.GaussianNB(),
@@ -422,9 +467,66 @@ if __name__ == '__main__':
     else:
         #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
         #write_to_file(pred_voted)
-        start = time.time()
-        validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=6)
-        end = time.time()
-        elapsed = end - start
-        print "Time taken: ", elapsed, "seconds."
+        if False:
+            subset = np.logical_or((tr_labels == 6),(tr_labels == 3))
+            subset = np.nonzero(subset)[0]
+            tmp_images = tr_images[subset]
+            tmp_labels = tr_labels[subset]
+            tmp_identity = tr_identity[subset]
+            
+            #score, pred = validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=6)
+            
+            validate_multiple(classifiers, tmp_images, tmp_labels, tmp_identity, nFold=6)
+
+                        
+            print "done"
+        else:
+                       
+            subset = np.logical_or((tr_labels == 6),(tr_labels == 3))
+            subset = np.nonzero(subset)[0]
+            tmp_images = tr_images[subset]
+            tmp_labels = tr_labels[subset]
+            trained_6 = svm.SVC().fit(tmp_images, tmp_labels.ravel())
+            
+            subset = np.logical_or((tr_labels == 7),(tr_labels == 5))
+            subset = np.nonzero(subset)[0]
+            tmp_images = tr_images[subset]
+            tmp_labels = tr_labels[subset]
+            trained_7 = svm.SVC().fit(tmp_images, tmp_labels.ravel())
+            
+           
+            start = time.time()
+            validate_multiple(classifiers, tr_images_O, tr_labels_O, tr_identity_O, nFold=6, aux_classify1 = trained_6, aux_classify2 = trained_7)
+            #validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=6)
+            end = time.time()
+            elapsed = end - start
+            print "Time taken: ", elapsed, "seconds."
+            """                
+            K = [.01, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1, 1.1, 1.2]
+            scores = []
+            for  k in K:
+                score, pred = validate_multiple([svm.SVC(C=k)], tr_images, tr_labels, tr_identity, nFold=6)                    
+                scores.append(score)
+            svmResult = zip(K, score)
+            print svmResult
+            
+            K = ["linear", "poly", "rbf", "sigmoid", "precomputed"]
+            scores = []
+            for  k in K:
+                score, pred = validate_multiple([svm.SVC(kernel=k)], tr_images, tr_labels, tr_identity, nFold=6)                    
+                scores.append(score)
+            svm2Result = zip(K, score)
+            print svm2Result
+            
+            K = [.01, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1, 1.1, 1.2]
+            K = np.array(K)
+            K = 1/(2*K)
+            
+            scores = []
+            score, pred = validate_multiple([linear_model.RidgeClassifierCV(alphas = K)], tr_images, tr_labels, tr_identity, nFold=6)                    
+            scores.append(score)
+            ridgeResult = zip(K, score)
+            print ridgeResult
+            
+            """           
 

@@ -51,7 +51,7 @@ def init_data():
         plt.imshow(tr_images[:,:,0], cmap=plt.cm.gray)
         plt.show()
 
-    ADD_TRANSFORMED_DATA = False
+    ADD_TRANSFORMED_DATA = True
     if ADD_TRANSFORMED_DATA:
         tr_images_0_1 = transform_(tr_images, 0, 1)
         tr_images_0_m1 = transform_(tr_images, 0, -1)
@@ -67,7 +67,7 @@ def init_data():
         things_to_join = (tr_identity, tr_identity, tr_identity, tr_identity, tr_identity)
         tr_identity = np.concatenate(things_to_join)
 
-    ADD_TRANSFORMED_DATA_2 = True
+    ADD_TRANSFORMED_DATA_2 = False
     if ADD_TRANSFORMED_DATA_2:
         tr_images_0_1 = transform_(tr_images, 0, 1)
         tr_images_0_m1 = transform_(tr_images, 0, -1)
@@ -99,8 +99,8 @@ def init_data():
         #test_images = np.array([exposure.equalize_hist(test_images[:,:,i]) for i in xrange(test_images.shape[2])])
         #tr_images = np.array([gaussian_filter(tr_images[:,:,i], sigma=0.5) for i in xrange(tr_images.shape[2])])
         #test_images = np.array([gaussian_filter(test_images[:,:,i], sigma=0.5) for i in xrange(test_images.shape[2])])
-        tr_images = np.array([filters.gaussian_laplace(tr_images[:,:,i], sigma=0.3) for i in xrange(tr_images.shape[2])])
-        test_images = np.array([filters.gaussian_laplace(test_images[:,:,i], sigma=0.3) for i in xrange(test_images.shape[2])])
+        tr_images = np.array([filters.gaussian_laplace(tr_images[:,:,i], sigma=0.5) for i in xrange(tr_images.shape[2])])
+        test_images = np.array([filters.gaussian_laplace(test_images[:,:,i], sigma=0.5) for i in xrange(test_images.shape[2])])
 
         #tr_images = np.array([filter.edges.prewitt(tr_images[:,:,i]) for i in xrange(tr_images.shape[2])])
         #test_images = np.array([filter.edges.prewitt(test_images[:,:,i]) for i in xrange(test_images.shape[2])])
@@ -484,10 +484,10 @@ if __name__ == '__main__':
         print "Overall rate:", final_score/float(pred_counter)
         print "range:", np.max(scores) - np.min(scores)
     else:
-        #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
-        #write_to_file(pred_voted)
+        pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
+        write_to_file(pred_voted)
         start = time.time()
-        validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=8)
+        #validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=8)
         end = time.time()
         elapsed = end - start
         print "Time taken: ", elapsed, "seconds."

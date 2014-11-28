@@ -23,6 +23,7 @@ from skimage.filter import threshold_otsu
 from skimage.feature import local_binary_pattern
 from scipy.ndimage import gaussian_filter, laplace
 from scipy.ndimage import filters
+from sklearn.metrics import confusion_matrix
 import run_knn, skLearnStuff
 import time
 import sys
@@ -99,8 +100,8 @@ def init_data():
         #test_images = np.array([exposure.equalize_hist(test_images[:,:,i]) for i in xrange(test_images.shape[2])])
         #tr_images = np.array([gaussian_filter(tr_images[:,:,i], sigma=0.5) for i in xrange(tr_images.shape[2])])
         #test_images = np.array([gaussian_filter(test_images[:,:,i], sigma=0.5) for i in xrange(test_images.shape[2])])
-        tr_images = np.array([filters.gaussian_laplace(tr_images[:,:,i], sigma=0.5) for i in xrange(tr_images.shape[2])])
-        test_images = np.array([filters.gaussian_laplace(test_images[:,:,i], sigma=0.5) for i in xrange(test_images.shape[2])])
+        tr_images = np.array([filters.gaussian_laplace(tr_images[:,:,i], sigma=[0.5, 0.60], mode='reflect') for i in xrange(tr_images.shape[2])])
+        test_images = np.array([filters.gaussian_laplace(test_images[:,:,i], sigma=[0.5, 0.60], mode='reflect') for i in xrange(test_images.shape[2])])
 
         #tr_images = np.array([filter.edges.prewitt(tr_images[:,:,i]) for i in xrange(tr_images.shape[2])])
         #test_images = np.array([filter.edges.prewitt(test_images[:,:,i]) for i in xrange(test_images.shape[2])])
@@ -245,6 +246,7 @@ def validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5, v
 
     j = 1
     valid_score = 0.0
+    total_labels, total_pred = [], []
     for nfold_tr_images, nfold_tr_labels, nfold_val_images, nfold_val_labels, nfold_val_identity in cross_validations(tr_images, tr_labels, tr_identity, nFold=nFold):
         prediction_ensemble = []
         for c in classifiers:
@@ -266,11 +268,12 @@ def validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=5, v
                 print "\tRate for identity({}): {}/{}".format(vid, v_rate, np.sum(nfold_val_identity==vid))
             """
 
-
+        total_pred.append(pred_voted)
+        total_labels.append(nfold_val_labels)
         j += 1
 
     print "Ensemble classification rate:", valid_score
-    return valid_score, pred_voted
+    return valid_score, pred_voted, total_pred, total_labels
 
 def generate_test_labels(classifiers, tr_images, tr_labels, test_images):
     pred_ensemble_test = []
@@ -424,7 +427,7 @@ if __name__ == '__main__':
 
     classifiers = [
         #neighbors.KNeighborsClassifier(n_neighbors=5, p=2),
-        svm.SVC(C=1.6),
+        #svm.SVC(C=1.6),
         #svm.LinearSVC(),
         #svm_bagging,
         #OneVsRestClassifier(svm.LinearSVC(random_state=0)),
@@ -438,7 +441,7 @@ if __name__ == '__main__':
         #trees_bagging,
         #RandomForestClassifier(n_estimators=150),
         #AdaBoostClassifier(n_estimators=100),
-        #bdt_real,
+        bdt_real,
         #adaboost,
     ]
 
@@ -484,10 +487,11 @@ if __name__ == '__main__':
         print "Overall rate:", final_score/float(pred_counter)
         print "range:", np.max(scores) - np.min(scores)
     else:
-        pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
-        write_to_file(pred_voted)
         start = time.time()
-        #validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=8)
+        #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
+        #write_to_file(pred_voted)
+        _, _, y_pred, y_true = validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=8)
+        print 'Confusion Matrix:\n', confusion_matrix(np.hstack(y_true), np.hstack(y_pred))
         end = time.time()
         elapsed = end - start
         print "Time taken: ", elapsed, "seconds."

@@ -273,11 +273,12 @@ if __name__ == '__main__':
     ]
 
     start = time.time()
-    #pred_voted, fitted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
-    #write_to_file(pred_voted)
-    #f = file('saved_model.pkl', 'w')
-    #pickle.dump(fitted, f)
-
+    pred_voted, fitted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
+    write_to_file(pred_voted)
+    f = file('trainedModel.pkl', 'w')
+    pickle.dump(fitted, f)
+    f.close()
+"""
     _, _, y_pred, y_true = validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=8)
     print 'Confusion Matrix:\n', confusion_matrix(np.hstack(y_true), np.hstack(y_pred))
     end = time.time()
@@ -285,3 +286,4 @@ if __name__ == '__main__':
     print "Time taken: ", elapsed, "seconds."
 
 
+"""

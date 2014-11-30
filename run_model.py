@@ -11,7 +11,7 @@ def init_data():
     test_images = imagesDic["public_test_images"].astype(float)
 
     # Preprocess the test set
-    test_images = np.array([filters.gaussian_laplace(test_images[:,:,i], sigma=[0.6, 0.6], mode='reflect') for i in xrange(test_images.shape[2])])
+    test_images = np.array([filters.gaussian_laplace(test_images[:,:,i], sigma=[0.5, 0.5], mode='reflect') for i in xrange(test_images.shape[2])])
     test_images = np.rollaxis(test_images, 0, 3)
 
     test_images = np.array([test_images[:,:,i].reshape(-1) for i in xrange(test_images.shape[2])])

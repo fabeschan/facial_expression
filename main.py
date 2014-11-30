@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 from sklearn import cross_validation
 from sklearn import datasets, neighbors, linear_model, svm, naive_bayes, tree
 from sklearn.ensemble import BaggingClassifier, RandomForestClassifier, AdaBoostClassifier
-from sklearn.multiclass import OutputCodeClassifier, OneVsRestClassifier
 from sklearn import preprocessing, cluster
 from sklearn.decomposition import PCA
 from skimage import filter, color, io, exposure
@@ -25,6 +24,7 @@ from sklearn.metrics import confusion_matrix
 import skLearnStuff
 import time
 import sys
+import pickle
 
 def init_data():
 
@@ -71,14 +71,14 @@ def init_data():
 
     ADD_TRANSFORMED_DATA_2 = False
     if ADD_TRANSFORMED_DATA_2:
-        tr_images_0_1 = transform_(tr_images, 0, 1)
-        tr_images_0_m1 = transform_(tr_images, 0, -1)
-        tr_images_1_0 = transform_(tr_images, 1, 0)
-        tr_images_m1_0 = transform_(tr_images, -1, 0)
-        tr_images_0_2 = transform_(tr_images, 1, 1)
-        tr_images_0_m2 = transform_(tr_images, 1, -1)
-        tr_images_2_0 = transform_(tr_images, -1, -1)
-        tr_images_m2_0 = transform_(tr_images, -1, 1)
+        tr_images_0_1 = transform_(tr_images, 0, 2)
+        tr_images_0_m1 = transform_(tr_images, 0, -2)
+        tr_images_1_0 = transform_(tr_images, 2, 0)
+        tr_images_m1_0 = transform_(tr_images, -2, 0)
+        tr_images_0_2 = transform_(tr_images, 2, 2)
+        tr_images_0_m2 = transform_(tr_images, 2, -2)
+        tr_images_2_0 = transform_(tr_images, -2, -2)
+        tr_images_m2_0 = transform_(tr_images, -2, 2)
 
         things_to_join = (tr_images, tr_images_0_1, tr_images_0_m1,  tr_images_1_0, tr_images_m1_0, tr_images_0_2, tr_images_0_m2,  tr_images_2_0, tr_images_m2_0)
         tr_images = np.concatenate(things_to_join, axis=2)
@@ -101,11 +101,11 @@ def init_data():
         #test_images = np.array([exposure.equalize_hist(test_images[:,:,i]) for i in xrange(test_images.shape[2])])
         #tr_images = np.array([gaussian_filter(tr_images[:,:,i], sigma=0.5) for i in xrange(tr_images.shape[2])])
         #test_images = np.array([gaussian_filter(test_images[:,:,i], sigma=0.5) for i in xrange(test_images.shape[2])])
-        #tr_images = np.array([filters.gaussian_laplace(tr_images[:,:,i], sigma=[0.5, 0.60], mode='reflect') for i in xrange(tr_images.shape[2])])
-        #test_images = np.array([filters.gaussian_laplace(test_images[:,:,i], sigma=[0.5, 0.60], mode='reflect') for i in xrange(test_images.shape[2])])
+        tr_images = np.array([filters.gaussian_laplace(tr_images[:,:,i], sigma=[0.5, 0.5], mode='reflect') for i in xrange(tr_images.shape[2])])
+        test_images = np.array([filters.gaussian_laplace(test_images[:,:,i], sigma=[0.5, 0.5], mode='reflect') for i in xrange(test_images.shape[2])])
 
-        #tr_images = np.rollaxis(tr_images, 0, 3)
-        #test_images = np.rollaxis(test_images, 0, 3)
+        tr_images = np.rollaxis(tr_images, 0, 3)
+        test_images = np.rollaxis(test_images, 0, 3)
 
         if SHOW_FILTER:
             plt.figure(2)
@@ -129,7 +129,7 @@ def init_data():
 
     # PCA reduction/projection
     if False:
-        dim = 250
+        dim = 350
         pca = PCA(n_components=dim)
         tr_images = pca.fit_transform(tr_images)
 
@@ -208,7 +208,7 @@ def generate_test_labels(classifiers, tr_images, tr_labels, test_images):
             d[k] = t + 1
         pred_test_voted[i] = max(d.keys(), key=lambda x: d[x])
 
-    return pred_test_voted
+    return pred_test_voted, fitted
 
 def cross_validations(images, labels, identity, nFold=5):
 
@@ -263,21 +263,25 @@ if __name__ == '__main__':
     tr_images, tr_labels, tr_identity, test_images = init_data()
 
     classifiers = [
-        neighbors.KNeighborsClassifier(n_neighbors=5, p=2),
-        #svm.SVC(C=1.6),
+        #neighbors.KNeighborsClassifier(n_neighbors=7, p=2),
+        svm.SVC(C=500),
         #svm.LinearSVC(),
         #linear_model.LogisticRegression(C=.01),
         #linear_model.RidgeClassifierCV(),
         #tree.DecisionTreeClassifier(criterion="entropy"),
-        #RandomForestClassifier(n_estimators=150),
+        #RandomForestClassifier(n_estimators=1000),
     ]
 
     start = time.time()
-    #pred_voted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
+    #pred_voted, fitted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
     #write_to_file(pred_voted)
+    #f = file('saved_model.pkl', 'w')
+    #pickle.dump(fitted, f)
+
     _, _, y_pred, y_true = validate_multiple(classifiers, tr_images, tr_labels, tr_identity, nFold=8)
     print 'Confusion Matrix:\n', confusion_matrix(np.hstack(y_true), np.hstack(y_pred))
     end = time.time()
     elapsed = end - start
     print "Time taken: ", elapsed, "seconds."
+
 

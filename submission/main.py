@@ -28,9 +28,12 @@ def init_data():
     # Test Data
     imagesDic = scipy.io.loadmat(file_name="public_test_images.mat")
     test_images = imagesDic["public_test_images"].astype(float)
+    print "test:", test_images.shape
+
     imagesDic = scipy.io.loadmat(file_name="hidden_test_images.mat")
     things_to_join = (test_images,imagesDic["hidden_test_images"].astype(float))
     test_images = np.concatenate(things_to_join, axis=2)
+    print "test:", test_images.shape
 
     ADD_TRANSFORMED_DATA = True
     if ADD_TRANSFORMED_DATA:
@@ -115,12 +118,57 @@ def write_to_file(predictions):
                 f.write(s)
 
 if __name__ == '__main__':
+    from pybrain.datasets            import ClassificationDataSet
+    from pybrain.utilities           import percentError
+    from pybrain.tools.shortcuts     import buildNetwork
+    from pybrain.supervised.trainers import BackpropTrainer
+    from pybrain.structure.modules   import SoftmaxLayer
     tr_images, tr_labels, tr_identity, test_images = init_data()
+    tr_labels=tr_labels-1
 
-    classifiers = [ svm.SVC(C=1.6) ]
+    N, D = tr_images.shape
+    print N, D
 
-    pred_voted, fitted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
+    alldata = ClassificationDataSet(D,1,nb_classes=7)
+    for n in xrange(N):
+        alldata.addSample(tr_images[n], tr_labels[n])
+
+    N_, D_ = test_images.shape
+    testdata = ClassificationDataSet(D_,1,nb_classes=7)
+    for n in xrange(N_):
+        testdata.addSample(tr_images[n], tr_labels[n])
+
+    tstdata, trndata = alldata.splitWithProportion( 0.00 )
+
+    trndata._convertToOneOfMany()
+    tstdata._convertToOneOfMany()
+
+    print "Number of training patterns: ", len(trndata)
+    print "Input and output dimensions: ", trndata.indim, trndata.outdim
+    print "First sample (input, target, class):"
+    print trndata['input'][0], trndata['target'][0], trndata['class'][1]
+
+    fnn = buildNetwork( trndata.indim, 100, trndata.outdim, outclass=SoftmaxLayer )
+
+    trainer = BackpropTrainer( fnn, dataset=trndata, momentum=0.2, verbose=False, weightdecay=0.01)
+
+    for i in range(5):
+        trainer.trainEpochs(5)
+        #trnresult = percentError( trainer.testOnClassData(),
+        #                          trndata['class'] )
+        #tstresult = percentError( trainer.testOnClassData(
+        #       dataset=tstdata ), tstdata['class'] )
+
+        #print "epoch: %4d" % trainer.totalepochs, \
+        #      "  train error: %5.2f%%" % trnresult, \
+        #      "  test error: %5.2f%%" % tstresult
+        print i
+    #classifiers = [ svm.SVC(C=1.6) ]
+    out = fnn.activateOnDataset(testdata)
+    pred_voted = out.argmax(axis=1) + 1
+
+    #pred_voted, fitted = generate_test_labels(classifiers, tr_images, tr_labels, test_images)
     write_to_file(pred_voted)
-    f = file('trainedModel.pkl', 'w')
-    pickle.dump(fitted, f)
-    f.close()
+    #f = file('trainedModel.pkl', 'w')
+    #pickle.dump(fitted, f)
+    #f.close()
